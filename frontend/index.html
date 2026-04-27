@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ro">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Stem Composer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/wavesurfer.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Stem Composer</h1>
+
+        <div id="dropzone" class="dropzone">
+            Trage fișierul audio aici sau dă click pentru upload
+            <input type="file" id="fileInput" hidden accept="audio/*">
+        </div>
+
+        <div id="status" class="hidden">
+            <p id="statusText">Se procesează melodia...</p>
+            <div class="loader"></div>
+        </div>
+
+        <div id="mixer" class="hidden">
+            <h2>Mixer Rezultate</h2>
+            <div id="waveform-vocals" class="track"><span>Vocals</span></div>
+            <div id="waveform-drums" class="track"><span>Drums</span></div>
+            <div id="waveform-bass" class="track"><span>Bass</span></div>
+            <div id="waveform-other" class="track"><span>Other</span></div>
+
+            <div class="controls">
+                <button id="playPauseBtn">Play / Pause</button>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+
+</html>

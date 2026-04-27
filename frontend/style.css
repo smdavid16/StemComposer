@@ -1,0 +1,62 @@
+body {
+    background: #121212;
+    color: white;
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 50px;
+}
+
+.container {
+    width: 100%;
+    max-width: 800px;
+}
+
+.dropzone {
+    border: 2px dashed #4F46E5;
+    padding: 40px;
+    text-align: center;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.dropzone.hover {
+    background: #1e1e1e;
+    border-color: #F43F5E;
+}
+
+.hidden {
+    display: none;
+}
+
+.track {
+    background: #1e1e1e;
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 8px;
+    position: relative;
+}
+
+.track span {
+    position: absolute;
+    left: 10px;
+    top: 5px;
+    font-size: 12px;
+    color: #aaa;
+    z-index: 10;
+}
+
+.controls {
+    margin-top: 20px;
+    text-align: center;
+}
+
+button {
+    background: #4F46E5;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+}

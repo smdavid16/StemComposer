@@ -1,0 +1,37 @@
+services:
+  # FRONTEND (Bianca)
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  # BACKEND (Django)
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/app
+      - media_data:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+
+  # CELERY WORKER (Procesare ML)
+  worker:
+    build: ./backend
+    command: celery -A core worker --loglevel=info
+    volumes:
+      - ./backend:/app
+      - media_data:/app/media
+    depends_on:
+      - redis
+      - backend
+
+  # REDIS (Broker)
+  redis:
+    image: redis:alpine
+
+volumes:
+  media_data: # Volum partajat pentru fișierele audio
