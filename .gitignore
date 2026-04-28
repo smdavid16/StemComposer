@@ -1,0 +1,45 @@
+# ========================
+# 1. Mediul Virtual (VENV)
+# ========================
+venv/
+env/
+.venv/
+
+# ========================
+# 2. Python & Django
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+db.sqlite3
+.env
+secret.key
+
+# ========================
+# 3. Fisiere Audio & Output Demucs
+# ========================
+# Nu vrem să urcăm pe Git melodiile tale de test sau rezultatele gigantice
+*.mp3
+*.wav
+*.flac
+*.ogg
+*.m4a
+separated/
+
+# ========================
+# 4. Celery & Redis
+# ========================
+celerybeat-schedule
+celerybeat.pid
+*.pid
+dump.rdb
+
+# ========================
+# 5. IDE-uri & OS
+# ========================
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
