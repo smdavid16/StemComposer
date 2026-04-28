@@ -1,4 +1,4 @@
-#!/home/toma/stemcomposer-midend/venv/bin/python3
+#!/home/david/Documents/StemComposer/StemComposer/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
