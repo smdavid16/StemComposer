@@ -1,29 +1,29 @@
-from celery import shared_task
 import os
 import subprocess
+from celery import shared_task
 
-@shared_task
-def proceseaza_melodia_task(nume_fisier, cale_folder_melodii):
+@shared_task(bind=True)
+def proceseaza_melodia_task(self, nume_fisier, cale_folder_melodii):
     cale_abs = os.path.abspath(cale_folder_melodii)
-    nume_fisier = nume_fisier.strip()
     
     comanda = [
         "docker", "run", "--rm",
         "-v", f"{cale_abs}:/app",
-        "-w", "/app",
         "stemcomposer",
         "demucs",
         nume_fisier
     ]
     
-    print(f"Executăm: {' '.join(comanda)}")
+    proces = subprocess.Popen(comanda, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     
-    rezultat = subprocess.run(comanda, capture_output=True, text=True)
+    log_complet = ""
+    for linie in proces.stdout:
+        log_complet += linie
+        self.update_state(state='PROGRESS', meta={'log': log_complet})
+        
+    proces.wait()
     
-    print(f"STDOUT: {rezultat.stdout}")
-    print(f"STDERR: {rezultat.stderr}")
-    
-    if rezultat.returncode == 0:
-        return f"Succes pentru {nume_fisier}"
+    if proces.returncode == 0:
+        return {'status': 'Succes', 'log': log_complet}
     else:
-        return f"Eroare: {rezultat.stderr}"
+        return {'status': 'Eroare', 'log': log_complet}
