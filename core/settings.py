@@ -125,4 +125,4 @@ CELERY_TASK_SERIALIZER = 'json'
 
 import os
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'melodii_de_procesat', 'separated')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
