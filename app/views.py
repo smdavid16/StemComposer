@@ -67,184 +67,808 @@ def verifica_status(request, task_id):
 from django.http import HttpResponse
 
 def interfata_simpla(request):
-    html = """
-    <!DOCTYPE html>
-    <html lang="ro">
-    <head>
-        <title>StemComposer Pro</title>
-        <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: white; padding: 20px; }
-            .card { background: #1e1e1e; padding: 20px; border-radius: 8px; max-width: 600px; margin: 20px auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-            input { width: 90%; padding: 10px; margin: 10px 0; background: #333; color: white; border: 1px solid #555; border-radius: 4px; }
-            .btn { background: #4CAF50; color: white; padding: 10px 20px; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; width: 100%; margin-top: 10px;}
-            .btn-blue { background: #2196F3; }
-            .console-box { background: #000; color: #0f0; height: 200px; overflow-y: scroll; padding: 10px; border: 1px solid #333; font-family: monospace; display: none; margin-top: 15px;}
-            .download-link { display: inline-block; background: #9c27b0; color: white; padding: 5px 10px; margin: 3px; text-decoration: none; border-radius: 3px; font-size: 12px; }
-            .istoric-item { background: #2d2d2d; padding: 10px; margin-top: 10px; border-radius: 5px; text-align: left; }
-            #sectiune-app, #sectiune-istoric { display: none; }
-        </style>
-    </head>
-    <body>
+    html = """<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StemComposer Pro &mdash; Studio</title>
+    <meta name="description" content="StemComposer Pro - Separa melodiile in stem-uri cu Demucs AI. Asculta, vizualizeaza si descarca vocals, drums, bass si other.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        html{scroll-behavior:smooth;}
 
-        <div class="card" id="sectiune-auth">
-            <h2>🔑 Autentificare</h2>
-            <input type="text" id="user" placeholder="Nume utilizator">
-            <input type="password" id="pass" placeholder="Parolă">
-            <button class="btn" onclick="auth('/api/login/')">Login</button>
-            <button class="btn btn-blue" onclick="auth('/api/signup/')">Creare Cont (Signup)</button>
-            <p id="auth-msg" style="color: yellow;"></p>
+        body{
+            font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+            background:#08080f;
+            color:#e2e8f0;
+            min-height:100vh;
+            padding:20px;
+            background-image:
+                radial-gradient(ellipse at 15% 50%,rgba(120,50,255,.03) 0%,transparent 50%),
+                radial-gradient(ellipse at 85% 20%,rgba(244,63,94,.03) 0%,transparent 50%);
+        }
+
+        /* ---- Cards ---- */
+        .card{
+            background:rgba(18,18,30,.85);
+            border:1px solid rgba(255,255,255,.06);
+            border-radius:16px;
+            padding:28px;
+            max-width:800px;
+            margin:16px auto;
+            box-shadow:0 8px 32px rgba(0,0,0,.4);
+            backdrop-filter:blur(20px);
+        }
+        h2{font-size:22px;font-weight:700;margin-bottom:16px;letter-spacing:-.02em;}
+
+        /* ---- Inputs ---- */
+        input[type="text"],input[type="password"]{
+            width:100%;padding:12px 16px;margin:6px 0;
+            background:rgba(255,255,255,.05);color:#e2e8f0;
+            border:1px solid rgba(255,255,255,.1);border-radius:10px;
+            font-family:inherit;font-size:14px;
+            transition:border-color .2s,box-shadow .2s;outline:none;
+        }
+        input[type="text"]:focus,input[type="password"]:focus{
+            border-color:rgba(168,85,247,.5);
+            box-shadow:0 0 0 3px rgba(168,85,247,.1);
+        }
+        input[type="file"]{
+            width:100%;padding:10px;margin:8px 0;
+            background:rgba(255,255,255,.05);color:#94a3b8;
+            border:1px solid rgba(255,255,255,.1);border-radius:10px;font-size:13px;
+        }
+
+        /* ---- Buttons ---- */
+        .btn{
+            width:100%;padding:12px;border:none;border-radius:10px;
+            font-family:inherit;font-weight:600;font-size:14px;
+            cursor:pointer;transition:all .2s ease;margin-top:8px;color:#fff;
+        }
+        .btn:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(0,0,0,.3);}
+        .btn:active{transform:translateY(0);}
+        .btn-primary{background:linear-gradient(135deg,#a855f7,#7c3aed);}
+        .btn-blue{background:linear-gradient(135deg,#3b82f6,#2563eb);}
+
+        .btn-ctrl{
+            padding:10px 20px;
+            border:1px solid rgba(255,255,255,.1);border-radius:10px;
+            background:rgba(255,255,255,.05);color:#e2e8f0;
+            font-family:inherit;font-weight:500;font-size:13px;
+            cursor:pointer;transition:all .2s ease;
+        }
+        .btn-ctrl:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);}
+
+        /* ---- Console ---- */
+        .console-box{
+            background:rgba(0,0,0,.5);color:#22c55e;
+            height:200px;overflow-y:auto;padding:14px;
+            border:1px solid rgba(255,255,255,.06);border-radius:10px;
+            font-family:'Courier New',monospace;font-size:12px;
+            display:none;margin-top:16px;
+        }
+
+        /* ---- Player ---- */
+        .player-subtitle{color:#94a3b8;font-size:14px;margin-bottom:20px;}
+
+        .track-card{
+            background:rgba(10,10,20,.6);
+            border:1px solid rgba(255,255,255,.04);
+            border-radius:12px;padding:16px;margin-bottom:10px;
+            transition:all .3s ease;
+        }
+        .track-card:hover{border-color:rgba(255,255,255,.08);}
+
+        @keyframes pulseGlow{
+            0%,100%{box-shadow:0 0 20px rgba(168,85,247,.05);}
+            50%{box-shadow:0 0 30px rgba(168,85,247,.15);}
+        }
+        .track-card.playing{
+            border-color:rgba(168,85,247,.25);
+            animation:pulseGlow 2s ease-in-out infinite;
+        }
+
+        .track-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+        .track-icon{font-size:18px;}
+        .track-name{font-weight:600;font-size:14px;flex:1;color:#f1f5f9;}
+        .track-time{
+            font-size:11px;color:#64748b;
+            font-variant-numeric:tabular-nums;
+            min-width:90px;text-align:right;
+        }
+        .track-btn{
+            width:34px;height:34px;border-radius:50%;border:none;
+            color:#fff;cursor:pointer;font-size:12px;
+            display:flex;align-items:center;justify-content:center;
+            transition:all .2s ease;flex-shrink:0;
+        }
+        .track-btn:hover{transform:scale(1.1);box-shadow:0 0 12px rgba(255,255,255,.15);}
+
+        .volume-slider{
+            width:70px;-webkit-appearance:none;appearance:none;
+            height:4px;border-radius:2px;
+            background:rgba(255,255,255,.1);outline:none;flex-shrink:0;
+        }
+        .volume-slider::-webkit-slider-thumb{
+            -webkit-appearance:none;width:14px;height:14px;
+            border-radius:50%;background:#fff;cursor:pointer;
+            box-shadow:0 0 4px rgba(0,0,0,.3);
+        }
+
+        .canvas-wrapper{position:relative;border-radius:8px;overflow:hidden;}
+        .spectrogram-canvas{
+            width:100%;height:100px;display:block;
+            cursor:crosshair;background:#06060c;border-radius:8px;
+        }
+        .canvas-loading{
+            position:absolute;top:0;left:0;right:0;bottom:0;
+            display:flex;align-items:center;justify-content:center;gap:10px;
+            background:rgba(6,6,12,.9);color:#64748b;font-size:12px;
+            border-radius:8px;
+        }
+        .canvas-loading.done{display:none;}
+
+        @keyframes spin{to{transform:rotate(360deg);}}
+        .loading-spinner{
+            width:16px;height:16px;
+            border:2px solid rgba(255,255,255,.1);
+            border-top-color:#a855f7;border-radius:50%;
+            animation:spin .8s linear infinite;
+        }
+
+        .global-controls{
+            display:flex;gap:10px;margin-top:16px;
+            justify-content:center;flex-wrap:wrap;
+        }
+
+        /* ---- Istoric ---- */
+        .istoric-item{
+            background:rgba(20,20,35,.6);padding:14px;margin-top:10px;
+            border-radius:10px;border:1px solid rgba(255,255,255,.04);
+            transition:border-color .2s;
+        }
+        .istoric-item:hover{border-color:rgba(255,255,255,.08);}
+
+        .download-link{
+            display:inline-block;
+            background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(124,58,237,.15));
+            color:#c4b5fd;padding:4px 10px;margin:3px;
+            text-decoration:none;border-radius:6px;
+            font-size:11px;font-weight:500;
+            border:1px solid rgba(168,85,247,.15);transition:all .2s;
+        }
+        .download-link:hover{
+            background:linear-gradient(135deg,rgba(168,85,247,.25),rgba(124,58,237,.25));
+            border-color:rgba(168,85,247,.35);
+        }
+
+        .btn-listen{
+            display:inline-block;
+            background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(217,119,6,.15));
+            color:#fbbf24;padding:4px 12px;margin:3px;
+            border-radius:6px;font-size:11px;font-weight:600;
+            border:1px solid rgba(245,158,11,.15);
+            cursor:pointer;transition:all .2s;
+        }
+        .btn-listen:hover{
+            background:linear-gradient(135deg,rgba(245,158,11,.25),rgba(217,119,6,.25));
+            border-color:rgba(245,158,11,.3);
+            box-shadow:0 0 12px rgba(245,158,11,.1);
+        }
+
+        #auth-msg{color:#fbbf24;font-size:13px;margin-top:8px;}
+        #sectiune-app,#sectiune-istoric,#sectiune-player{display:none;}
+    </style>
+</head>
+<body>
+
+    <!-- ========== AUTH ========== -->
+    <div class="card" id="sectiune-auth">
+        <h2>&#128273; Autentificare</h2>
+        <input type="text" id="user" placeholder="Nume utilizator">
+        <input type="password" id="pass" placeholder="Parola">
+        <button class="btn btn-primary" onclick="auth('/api/login/')">Login</button>
+        <button class="btn btn-blue" onclick="auth('/api/signup/')">Creare Cont</button>
+        <p id="auth-msg"></p>
+    </div>
+
+    <!-- ========== APP / UPLOAD ========== -->
+    <div class="card" id="sectiune-app">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="margin-bottom:0;">&#127925; Studio StemComposer</h2>
+            <button class="btn-ctrl" onclick="delogare()" style="color:#f43f5e;border-color:rgba(244,63,94,.3);">&#128682; Iesi din cont</button>
         </div>
+        <input type="file" id="fileInput" accept=".mp3,.wav">
+        <button class="btn btn-primary" onclick="startProcesare()">Proceseaza Melodie</button>
+        <div id="console" class="console-box"></div>
+    </div>
 
-        <div class="card" id="sectiune-app">
-            <button onclick="delogare()" style="background: #f44336; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; float: right;">🚪 Ieși din cont</button>
-            <h2 style="margin-top: 0;">🎵 Studio StemComposer</h2>
-            <input type="file" id="fileInput" accept=".mp3,.wav">
-            <button class="btn" onclick="startProcesare()">Procesează Melodie Nouă</button>
-            <div id="console" class="console-box"></div>
-            <div id="rezultate" style="margin-top: 15px;"></div>
+    <!-- ========== PLAYER ========== -->
+    <div class="card" id="sectiune-player">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <h2 style="margin-bottom:0;">&#127911; Studio Player</h2>
+            <button class="btn-ctrl" onclick="inchidePlayer()" style="font-size:16px;padding:6px 12px;">&#10005;</button>
         </div>
-
-        <div class="card" id="sectiune-istoric">
-            <h2>📚 Istoricul Meu</h2>
-            <button class="btn btn-blue" onclick="incarcaIstoric()">Refresh Istoric</button>
-            <div id="lista-istoric"></div>
+        <p id="player-titlu" class="player-subtitle"></p>
+        <div id="player-tracks"></div>
+        <div class="global-controls" id="global-controls" style="display:none;">
+            <button class="btn-ctrl" onclick="playAll()">&#9654; Play All</button>
+            <button class="btn-ctrl" onclick="pauseAll()">&#9646;&#9646; Pause All</button>
+            <button class="btn-ctrl" onclick="stopAll()">&#9632; Stop</button>
         </div>
+    </div>
 
-        <script>
-            async function auth(url) {
-                const u = document.getElementById('user').value;
-                const p = document.getElementById('pass').value;
-                let csrfToken = getCookie('csrftoken');
+    <!-- ========== ISTORIC ========== -->
+    <div class="card" id="sectiune-istoric">
+        <h2>&#128218; Istoricul Meu</h2>
+        <button class="btn btn-blue" onclick="incarcaIstoric()">Refresh Istoric</button>
+        <div id="lista-istoric"></div>
+    </div>
 
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                    body: JSON.stringify({username: u, password: p})
-                });
-                
-                const data = await res.json();
-                
-                if(res.ok) {
-                    document.getElementById('sectiune-auth').style.display = 'none';
-                    document.getElementById('sectiune-app').style.display = 'block';
-                    document.getElementById('sectiune-istoric').style.display = 'block';
-                    incarcaIstoric();
-                } else {
-                    document.getElementById('auth-msg').innerText = data.eroare || "Eroare!";
+<script>
+/* ================================================================
+   STEMCOMPOSER PRO  -  Audio Player + Spectrogram Visualization
+   ================================================================ */
+
+// ===== TRACK CONFIGURATION =====
+var TRACK_CFG = {
+    original: {name:'Original', icon:'\\u{1F3B5}', hue:38,  color:'#f59e0b'},
+    vocals:   {name:'Vocals',   icon:'\\u{1F3A4}', hue:275, color:'#a855f7'},
+    drums:    {name:'Drums',    icon:'\\u{1F941}', hue:348, color:'#f43f5e'},
+    bass:     {name:'Bass',     icon:'\\u{1F3B8}', hue:217, color:'#3b82f6'},
+    other:    {name:'Other',    icon:'\\u{1F3B9}', hue:160, color:'#10b981'}
+};
+var audioCtx = null;
+var tracks = {};
+var animId = null;
+
+// ===== FFT  (Cooley-Tukey radix-2) =====
+function fftTransform(re, im, N) {
+    var j = 0, i, k, len, half, ang, wR, wI, cR, cI, idx, tR, tI, nR, tmp;
+    for (i = 0; i < N - 1; i++) {
+        if (i < j) {
+            tmp = re[i]; re[i] = re[j]; re[j] = tmp;
+            tmp = im[i]; im[i] = im[j]; im[j] = tmp;
+        }
+        k = N >> 1;
+        while (k <= j) { j -= k; k >>= 1; }
+        j += k;
+    }
+    for (len = 2; len <= N; len *= 2) {
+        half = len >> 1;
+        ang = -2 * Math.PI / len;
+        wR = Math.cos(ang);
+        wI = Math.sin(ang);
+        for (i = 0; i < N; i += len) {
+            cR = 1; cI = 0;
+            for (k = 0; k < half; k++) {
+                idx = i + k + half;
+                tR = cR * re[idx] - cI * im[idx];
+                tI = cR * im[idx] + cI * re[idx];
+                re[idx] = re[i + k] - tR;
+                im[idx] = im[i + k] - tI;
+                re[i + k] += tR;
+                im[i + k] += tI;
+                nR = cR * wR - cI * wI;
+                cI = cR * wI + cI * wR;
+                cR = nR;
+            }
+        }
+    }
+}
+
+// ===== SPECTROGRAM COMPUTATION =====
+function computeSpectro(audioBuffer, numCols) {
+    var FFTSIZE = 1024;
+    var data = audioBuffer.getChannelData(0);
+    var total = data.length;
+    var hop = Math.floor(total / numCols);
+    var halfFFT = FFTSIZE >> 1;
+    var result = [];
+    var c, s, i, idx, re, im, mags, windowVal;
+
+    for (c = 0; c < numCols; c++) {
+        s = c * hop;
+        re = new Float32Array(FFTSIZE);
+        im = new Float32Array(FFTSIZE);
+        for (i = 0; i < FFTSIZE; i++) {
+            idx = s + i;
+            if (idx < total) {
+                windowVal = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (FFTSIZE - 1));
+                re[i] = data[idx] * windowVal;
+            }
+        }
+        fftTransform(re, im, FFTSIZE);
+        mags = new Float32Array(halfFFT);
+        for (i = 0; i < halfFFT; i++) {
+            mags[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+        }
+        result.push(mags);
+    }
+    return result;
+}
+
+// ===== COLOR HELPERS =====
+function hsl2rgb(h, s, l) {
+    var r, g, b, q, p;
+    function h2r(pp, qq, t) {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return pp + (qq - pp) * 6 * t;
+        if (t < 1/2) return qq;
+        if (t < 2/3) return pp + (qq - pp) * (2/3 - t) * 6;
+        return pp;
+    }
+    if (s === 0) { r = g = b = l; }
+    else {
+        q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        p = 2 * l - q;
+        r = h2r(p, q, h + 1/3);
+        g = h2r(p, q, h);
+        b = h2r(p, q, h - 1/3);
+    }
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function spectroColor(val, hue) {
+    if (val < 0.02) return [8, 8, 16];
+    var t = Math.pow(val, 0.6);
+    return hsl2rgb(hue / 360, 0.6 + t * 0.4, 0.06 + t * 0.55);
+}
+
+// ===== RENDER SPECTROGRAM TO CANVAS =====
+function renderSpectro(canvas, spectro, hue) {
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+    var nCols = spectro.length;
+    var nBins = spectro[0].length;
+    var showBins = Math.floor(nBins * 0.35);
+    var maxM = 0, x, y, ci, bi, mag, norm, rgb, idx;
+
+    for (ci = 0; ci < nCols; ci++)
+        for (bi = 0; bi < showBins; bi++)
+            if (spectro[ci][bi] > maxM) maxM = spectro[ci][bi];
+    if (maxM === 0) maxM = 1;
+
+    var img = ctx.createImageData(w, h);
+    var px = img.data;
+
+    for (x = 0; x < w; x++) {
+        ci = Math.min(Math.floor(x * nCols / w), nCols - 1);
+        for (y = 0; y < h; y++) {
+            bi = Math.floor((1 - y / h) * showBins);
+            if (bi >= showBins) bi = showBins - 1;
+            mag = spectro[ci][bi];
+            norm = Math.log1p(mag * 10) / Math.log1p(maxM * 10);
+            rgb = spectroColor(norm, hue);
+            idx = (y * w + x) << 2;
+            px[idx] = rgb[0]; px[idx+1] = rgb[1]; px[idx+2] = rgb[2]; px[idx+3] = 255;
+        }
+    }
+    ctx.putImageData(img, 0, 0);
+    return img;
+}
+
+// ===== AUDIO CONTEXT =====
+function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+// ===== OPEN PLAYER =====
+function deschidePlayer(melodieId) {
+    initAudio();
+    fetch('/api/melodie/' + melodieId + '/')
+    .then(function(res) {
+        if (!res.ok) throw new Error('Eroare server');
+        return res.json();
+    })
+    .then(function(data) {
+        stopAll();
+        tracks = {};
+
+        document.getElementById('sectiune-player').style.display = 'block';
+        document.getElementById('player-titlu').innerText = data.titlu;
+
+        var list = [{id:'original', url:data.url_original}];
+        data.stemuri.forEach(function(s) { list.push({id:s.tip, url:s.url}); });
+
+        var container = document.getElementById('player-tracks');
+        container.innerHTML = list.map(function(t) {
+            var c = TRACK_CFG[t.id];
+            return '<div class="track-card" id="track-' + t.id + '">' +
+                '<div class="track-header">' +
+                    '<span class="track-icon">' + c.icon + '</span>' +
+                    '<span class="track-name">' + c.name + '</span>' +
+                    '<span class="track-time" id="time-' + t.id + '">0:00 / 0:00</span>' +
+                    '<button class="track-btn" id="btn-' + t.id + '" style="background:' + c.color + '">&#9654;</button>' +
+                    '<input type="range" class="volume-slider" id="vol-' + t.id + '" min="0" max="100" value="100">' +
+                '</div>' +
+                '<div class="canvas-wrapper">' +
+                    '<canvas id="canvas-' + t.id + '" class="spectrogram-canvas"></canvas>' +
+                    '<div class="canvas-loading" id="loading-' + t.id + '">' +
+                        '<div class="loading-spinner"></div>' +
+                        '<span>Se incarca...</span>' +
+                    '</div>' +
+                '</div></div>';
+        }).join('');
+
+        // Attach event listeners & setup canvases
+        list.forEach(function(t) {
+            document.getElementById('btn-' + t.id).addEventListener('click', function() { toggleTrack(t.id); });
+            document.getElementById('vol-' + t.id).addEventListener('input', function() { setVol(t.id, this.value); });
+
+            var cv = document.getElementById('canvas-' + t.id);
+            var rect = cv.getBoundingClientRect();
+            cv.width  = Math.floor(rect.width);
+            cv.height = Math.floor(rect.height);
+
+            cv.addEventListener('click', function(e) {
+                var tr = tracks[t.id];
+                if (tr && tr.buffer) {
+                    var ratio = e.offsetX / cv.clientWidth;
+                    seekAll(ratio * tr.buffer.duration);
                 }
-            }
-
-            async function delogare() {
-                let csrfToken = getCookie('csrftoken');
-                
-                await fetch('/api/logout/', {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken }
-                });
-                
-                document.getElementById('sectiune-app').style.display = 'none';
-                document.getElementById('sectiune-istoric').style.display = 'none';
-                document.getElementById('sectiune-auth').style.display = 'block';
-                
-                document.getElementById('user').value = '';
-                document.getElementById('pass').value = '';
-                document.getElementById('auth-msg').style.color = '#4CAF50';
-                document.getElementById('auth-msg').innerText = "Te-ai delogat cu succes!";
-                document.getElementById('lista-istoric').innerHTML = "";
-            }
-
-            async function incarcaIstoric() {
-                const res = await fetch('/api/istoric/');
-                if(!res.ok) return;
-                const date = await res.json();
-                
-                const div = document.getElementById('lista-istoric');
-                div.innerHTML = "";
-                
-                date.forEach(m => {
-                    let htmlStemuri = m.stemuri.map(s => `<a class="download-link" href="${s.url}" download>${s.tip}</a>`).join('');
-                    div.innerHTML += `
-                        <div class="istoric-item">
-                            <strong>${m.titlu}</strong> <br>
-                            <small style="color: gray;">Procesat la: ${m.data}</small><br>
-                            ${htmlStemuri || '<small style="color: orange;">Inca se proceseaza...</small>'}
-                        </div>
-                    `;
-                });
-            }
-
-            function startProcesare() {
-                const file = document.getElementById('fileInput').files[0];
-                if(!file) return alert("Alege fisier!");
-
-                let fd = new FormData();
-                fd.append('file', file);
-
-                document.getElementById('console').style.display = 'block';
-                document.getElementById('console').innerText = "Se trimite catre server...";
-                
-                let csrfToken = getCookie('csrftoken');
-
-                fetch('/api/upload/', { 
-                    method: 'POST', 
-                    body: fd,
-                    headers: { 'X-CSRFToken': csrfToken }
-                })
-                .then(async r => {
-                    if (!r.ok) {
-                        let text = await r.text();
-                        throw new Error(`Eroare Server (Status ${r.status}): ${text.substring(0, 100)}...`);
-                    }
-                    return r.json();
-                })
-                .then(data => {
-                    if(data.eroare) throw new Error(data.eroare);
-                    document.getElementById('console').innerText = "Fisier salvat. Asteptam procesarea Celery...";
-                    pollStatus(data.task_id, data.melodie_id);
-                })
-                .catch(err => {
-                    document.getElementById('console').style.color = "red";
-                    document.getElementById('console').innerText = "❌ S-a blocat: " + err.message;
-                    console.error(err);
-                });
-            }
-
-            function pollStatus(taskId, melodieId) {
-                let interval = setInterval(() => {
-                    fetch(`/api/status/${taskId}/`)
-                    .then(r => r.json())
-                    .then(data => {
-                        const cDiv = document.getElementById('console');
-                        if (data.log) {
-                            cDiv.innerText = data.log;
-                            cDiv.scrollTop = cDiv.scrollHeight;
-                        }
-                        if(data.state === 'SUCCESS') {
-                            clearInterval(interval);
-                            incarcaIstoric();
-                        }
-                    });
-                }, 1500);
-            }
-
-            function getCookie(name) {
-                let cookieValue = null;
-                if (document.cookie && document.cookie !== '') {
-                    const cookies = document.cookie.split(';');
-                    for (let i = 0; i < cookies.length; i++) {
-                        const cookie = cookies[i].trim();
-                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                            break;
-                        }
-                    }
+            });
+            cv.addEventListener('mousemove', function(e) {
+                var tr = tracks[t.id];
+                if (tr && tr.buffer) {
+                    cv.title = fmtTime((e.offsetX / cv.clientWidth) * tr.buffer.duration);
                 }
-                return cookieValue;
+            });
+        });
+
+        // Load all tracks in parallel
+        var loadPromises = list.map(function(t) { return loadTrack(t.id, t.url); });
+        Promise.allSettled(loadPromises).then(function() {
+            document.getElementById('global-controls').style.display = 'flex';
+        });
+
+        document.getElementById('sectiune-player').scrollIntoView({behavior:'smooth'});
+    })
+    .catch(function(err) {
+        alert('Eroare la deschiderea playerului: ' + err.message);
+    });
+}
+
+// ===== LOAD SINGLE TRACK =====
+function loadTrack(id, url) {
+    return fetch(url)
+    .then(function(resp) { return resp.arrayBuffer(); })
+    .then(function(ab) { return audioCtx.decodeAudioData(ab); })
+    .then(function(buffer) {
+        var gain = audioCtx.createGain();
+        gain.connect(audioCtx.destination);
+
+        var cv = document.getElementById('canvas-' + id);
+        var spectro = computeSpectro(buffer, cv.width);
+        var imgData = renderSpectro(cv, spectro, TRACK_CFG[id].hue);
+
+        tracks[id] = {
+            buffer: buffer, gain: gain, source: null, canvas: cv,
+            img: imgData, isPlaying: false, startT: 0, pauseOff: 0
+        };
+
+        document.getElementById('time-' + id).innerText = '0:00 / ' + fmtTime(buffer.duration);
+        document.getElementById('loading-' + id).classList.add('done');
+    })
+    .catch(function(err) {
+        console.error('Eroare track ' + id + ':', err);
+        document.getElementById('loading-' + id).innerHTML = '<span style="color:#f43f5e;">Eroare la incarcare</span>';
+    });
+}
+
+// ===== PLAYBACK CONTROLS =====
+function toggleTrack(id) {
+    var t = tracks[id];
+    if (!t) return;
+    if (t.isPlaying) pauseTrack(id); else playTrack(id);
+}
+
+function playTrack(id) {
+    var t = tracks[id];
+    if (!t || t.isPlaying) return;
+    initAudio();
+    var src = audioCtx.createBufferSource();
+    src.buffer = t.buffer;
+    src.connect(t.gain);
+    var off = Math.min(t.pauseOff, t.buffer.duration - 0.01);
+    if (off < 0) off = 0;
+    src.start(0, off);
+    t.source = src;
+    t.startT = audioCtx.currentTime - off;
+    t.isPlaying = true;
+
+    src.onended = function() {
+        if (t.isPlaying) {
+            t.isPlaying = false;
+            t.pauseOff = 0;
+            updateBtn(id);
+            drawProgress(id);
+        }
+    };
+    updateBtn(id);
+    startAnim();
+}
+
+function pauseTrack(id) {
+    var t = tracks[id];
+    if (!t || !t.isPlaying) return;
+    t.pauseOff = audioCtx.currentTime - t.startT;
+    t.source.onended = null;
+    t.source.stop();
+    t.isPlaying = false;
+    updateBtn(id);
+    var anyPlaying = false;
+    for (var k in tracks) { if (tracks[k].isPlaying) { anyPlaying = true; break; } }
+    if (!anyPlaying) stopAnim();
+}
+
+function seekAll(time) {
+    for (var id in tracks) {
+        var t = tracks[id];
+        if (!t) continue;
+        var was = t.isPlaying;
+        if (was) { t.source.onended = null; t.source.stop(); t.isPlaying = false; }
+        t.pauseOff = Math.max(0, Math.min(time, t.buffer.duration - 0.01));
+        if (was) playTrack(id);
+        else drawProgress(id);
+    }
+}
+
+function playAll() {
+    for (var id in tracks) { if (!tracks[id].isPlaying) playTrack(id); }
+}
+
+function pauseAll() {
+    for (var id in tracks) { pauseTrack(id); }
+}
+
+function stopAll() {
+    for (var id in tracks) {
+        var t = tracks[id];
+        if (!t) continue;
+        if (t.isPlaying) { t.source.onended = null; t.source.stop(); t.isPlaying = false; }
+        t.pauseOff = 0;
+        updateBtn(id);
+        drawProgress(id);
+    }
+    stopAnim();
+}
+
+function setVol(id, v) {
+    if (tracks[id]) tracks[id].gain.gain.value = v / 100;
+}
+
+function inchidePlayer() {
+    stopAll();
+    tracks = {};
+    document.getElementById('sectiune-player').style.display = 'none';
+    document.getElementById('global-controls').style.display = 'none';
+}
+
+// ===== ANIMATION LOOP =====
+function startAnim() { if (!animId) animate(); }
+function stopAnim()  { if (animId) { cancelAnimationFrame(animId); animId = null; } }
+
+function animate() {
+    var anyPlaying = false;
+    for (var id in tracks) {
+        drawProgress(id);
+        if (tracks[id].isPlaying) anyPlaying = true;
+    }
+    if (anyPlaying) animId = requestAnimationFrame(animate);
+    else animId = null;
+}
+
+// ===== DRAW PROGRESS ON CANVAS =====
+function drawProgress(id) {
+    var t = tracks[id];
+    if (!t || !t.img) return;
+    var cv = t.canvas;
+    var ctx = cv.getContext('2d');
+    var w = cv.width, h = cv.height;
+
+    // Redraw cached spectrogram
+    ctx.putImageData(t.img, 0, 0);
+
+    var cur = t.isPlaying ? (audioCtx.currentTime - t.startT) : t.pauseOff;
+    if (cur < 0) cur = 0;
+    var dur = t.buffer.duration;
+    var prog = Math.min(cur / dur, 1);
+    var x = prog * w;
+
+    // Played-region tint
+    ctx.fillStyle = 'rgba(255,255,255,.04)';
+    ctx.fillRect(0, 0, x, h);
+
+    // Progress line with glow
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,255,255,.7)';
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = 'rgba(255,255,255,.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+    ctx.restore();
+
+    // Progress dot (center marker)
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(x, h / 2, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Update time label
+    var el = document.getElementById('time-' + id);
+    if (el) el.innerText = fmtTime(cur) + ' / ' + fmtTime(dur);
+}
+
+function updateBtn(id) {
+    var t = tracks[id];
+    if (!t) return;
+    var btn = document.getElementById('btn-' + id);
+    var card = document.getElementById('track-' + id);
+    if (!btn || !card) return;
+    if (t.isPlaying) {
+        btn.innerHTML = '&#9646;&#9646;';
+        card.classList.add('playing');
+    } else {
+        btn.innerHTML = '&#9654;';
+        card.classList.remove('playing');
+    }
+}
+
+function fmtTime(s) {
+    if (isNaN(s) || s < 0) s = 0;
+    var m = Math.floor(s / 60);
+    var sec = Math.floor(s % 60);
+    return m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+// ===== AUTHENTICATION =====
+function auth(url) {
+    var u = document.getElementById('user').value;
+    var p = document.getElementById('pass').value;
+    var csrf = getCookie('csrftoken');
+
+    fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRFToken':csrf},
+        body: JSON.stringify({username:u, password:p})
+    })
+    .then(function(res) { return res.json().then(function(d) { return {ok:res.ok, data:d}; }); })
+    .then(function(r) {
+        if (r.ok) {
+            document.getElementById('sectiune-auth').style.display = 'none';
+            document.getElementById('sectiune-app').style.display = 'block';
+            document.getElementById('sectiune-istoric').style.display = 'block';
+            incarcaIstoric();
+        } else {
+            document.getElementById('auth-msg').innerText = r.data.eroare || 'Eroare!';
+        }
+    });
+}
+
+function delogare() {
+    var csrf = getCookie('csrftoken');
+    fetch('/api/logout/', {method:'POST', headers:{'X-CSRFToken':csrf}})
+    .then(function() {
+        document.getElementById('sectiune-app').style.display = 'none';
+        document.getElementById('sectiune-istoric').style.display = 'none';
+        document.getElementById('sectiune-player').style.display = 'none';
+        document.getElementById('sectiune-auth').style.display = 'block';
+        document.getElementById('user').value = '';
+        document.getElementById('pass').value = '';
+        document.getElementById('auth-msg').style.color = '#22c55e';
+        document.getElementById('auth-msg').innerText = 'Te-ai delogat cu succes!';
+        document.getElementById('lista-istoric').innerHTML = '';
+        stopAll();
+        tracks = {};
+    });
+}
+
+// ===== ISTORIC =====
+function incarcaIstoric() {
+    fetch('/api/istoric/')
+    .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
+    .then(function(date) {
+        var div = document.getElementById('lista-istoric');
+        div.innerHTML = '';
+        date.forEach(function(m) {
+            var item = document.createElement('div');
+            item.className = 'istoric-item';
+
+            var stemLinks = m.stemuri.map(function(s) {
+                return '<a class="download-link" href="' + s.url + '" download>' + s.tip + '</a>';
+            }).join('');
+
+            item.innerHTML = '<strong>' + m.titlu + '</strong><br>' +
+                '<small style="color:#64748b;">Procesat la: ' + m.data + '</small><br>' +
+                stemLinks;
+
+            if (m.stemuri.length > 0) {
+                var btn = document.createElement('span');
+                btn.className = 'btn-listen';
+                btn.innerHTML = '&#127911; Asculta';
+                btn.addEventListener('click', (function(mid) {
+                    return function() { deschidePlayer(mid); };
+                })(m.id));
+                item.appendChild(btn);
+            } else {
+                item.innerHTML += ' <small style="color:orange;">Inca se proceseaza...</small>';
             }
-        </script>
-    </body>
-    </html>
-    """
+            div.appendChild(item);
+        });
+    })
+    .catch(function() {});
+}
+
+// ===== UPLOAD & PROCESARE =====
+function startProcesare() {
+    var file = document.getElementById('fileInput').files[0];
+    if (!file) return alert('Alege fisier!');
+
+    var fd = new FormData();
+    fd.append('file', file);
+
+    document.getElementById('console').style.display = 'block';
+    document.getElementById('console').style.color = '#22c55e';
+    document.getElementById('console').innerText = 'Se trimite catre server...';
+
+    var csrf = getCookie('csrftoken');
+
+    fetch('/api/upload/', {method:'POST', body:fd, headers:{'X-CSRFToken':csrf}})
+    .then(function(r) {
+        if (!r.ok) return r.text().then(function(txt) { throw new Error('Eroare Server (' + r.status + '): ' + txt.substring(0,100)); });
+        return r.json();
+    })
+    .then(function(data) {
+        if (data.eroare) throw new Error(data.eroare);
+        document.getElementById('console').innerText = 'Fisier salvat. Asteptam procesarea Celery...';
+        pollStatus(data.task_id);
+    })
+    .catch(function(err) {
+        document.getElementById('console').style.color = '#f43f5e';
+        document.getElementById('console').innerText = 'Eroare: ' + err.message;
+    });
+}
+
+function pollStatus(taskId) {
+    var interval = setInterval(function() {
+        fetch('/api/status/' + taskId + '/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var cDiv = document.getElementById('console');
+            if (data.log) { cDiv.innerText = data.log; cDiv.scrollTop = cDiv.scrollHeight; }
+            if (data.state === 'SUCCESS') { clearInterval(interval); incarcaIstoric(); }
+        });
+    }, 1500);
+}
+
+// ===== COOKIE HELPER =====
+function getCookie(name) {
+    var val = null;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var c = cookies[i].trim();
+            if (c.substring(0, name.length + 1) === (name + '=')) {
+                val = decodeURIComponent(c.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return val;
+}
+</script>
+</body>
+</html>"""
     return HttpResponse(html)
 
 @api_view(['POST'])
@@ -300,12 +924,30 @@ def istoric_melodii(request):
     for m in melodii:
         stemuri = m.stemuri.all()
         rezultat.append({
+            "id": m.id,
             "titlu": m.titlu,
             "data": m.data_incarcare.strftime("%d-%m-%Y %H:%M"),
+            "url_original": m.fisier_original.url,
             "stemuri": [{"tip": s.tip, "url": s.fisier_stem.url} for s in stemuri]
         })
         
     return Response(rezultat)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def detalii_melodie(request, melodie_id):
+    try:
+        melodie = Melodie.objects.get(id=melodie_id, user=request.user)
+    except Melodie.DoesNotExist:
+        return Response({"eroare": "Melodia nu a fost gasita"}, status=404)
+    
+    stemuri = melodie.stemuri.all()
+    return Response({
+        "id": melodie.id,
+        "titlu": melodie.titlu,
+        "url_original": melodie.fisier_original.url,
+        "stemuri": [{"tip": s.tip, "url": s.fisier_stem.url} for s in stemuri]
+    })
 
 @api_view(['POST'])
 def logout_view(request):
