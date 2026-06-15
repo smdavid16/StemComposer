@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from app.views import incarca_melodie, interfata_simpla, verifica_status 
 from app.views import signup_view, login_view, istoric_melodii, logout_view, detalii_melodie
+from app.views import gemini_chat
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -16,6 +17,7 @@ urlpatterns = [
     path('api/istoric/', istoric_melodii, name='istoric'),
     path('api/melodie/<int:melodie_id>/', detalii_melodie, name='detalii_melodie'),
     path('api/logout/', logout_view, name='logout'),
+    path('api/chat/', gemini_chat, name='gemini_chat'),
 
     path('', interfata_simpla, name='home'),
 ]

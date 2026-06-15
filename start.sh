@@ -1,7 +1,7 @@
 #!/bin/bash
 python3 -m venv venv
 source venv/bin/activate
-pip install django celery redis djangorestframework
+pip install django celery redis djangorestframework python-dotenv google-genai
 
 echo "Pornim Redis, Celery si Django..."
 sudo systemctl start redis-server

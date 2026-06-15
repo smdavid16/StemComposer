@@ -4,9 +4,10 @@ from celery import shared_task
 
 def are_nvidia_gpu():
     try:
-        subprocess.check_output(["nvidia-smi", "-L"], stderr=subprocess.STDOUT)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Check if Docker has the NVIDIA runtime installed
+        output = subprocess.check_output(["docker", "info"], stderr=subprocess.STDOUT, text=True)
+        return "nvidia" in output.lower()
+    except Exception:
         return False
 
 @shared_task(bind=True)

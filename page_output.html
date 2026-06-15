@@ -1,73 +1,4 @@
-import os
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from django.core.files.storage import FileSystemStorage
-from django.http import HttpResponse
-from .tasks import proceseaza_melodia_task
-from celery.result import AsyncResult
-from django.http import JsonResponse
-from django.http import HttpResponse
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from .models import Melodie, Stem
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def incarca_melodie(request):
-    if 'file' not in request.FILES:
-        return Response({"eroare": "Nu a fost trimis niciun fisier!"}, status=400)
-
-    fisier = request.FILES['file']
-    
-    melodie_db = Melodie.objects.create(
-        user=request.user,
-        titlu=fisier.name,
-        fisier_original=fisier
-    )
-    
-    cale_fisier_original = melodie_db.fisier_original.path
-    nume_fisier_salvat = os.path.basename(cale_fisier_original)
-    folder_salvare = os.path.dirname(cale_fisier_original)
-    
-    task = proceseaza_melodia_task.delay(melodie_db.id, nume_fisier_salvat, folder_salvare)
-    
-    return Response({
-        "task_id": task.id,
-        "melodie_id": melodie_db.id
-    })
-
-@api_view(['GET'])
-def verifica_status(request, task_id):
-    res = AsyncResult(task_id)
-    nume_fisier = request.GET.get('nume', '')
-    
-    nume_folder_piesa = nume_fisier.split('.')[0] if nume_fisier else ''
-    
-    cale_rezultate = os.path.join(os.getcwd(), 'melodii_de_procesat', 'separated', 'htdemucs', nume_folder_piesa)
-    gata = os.path.exists(cale_rezultate)
-
-    log_text = ""
-    if res.state == 'PROGRESS' or res.state == 'SUCCESS':
-        
-        info = res.info
-        if isinstance(info, dict):
-            log_text = info.get('log', '')
-
-    return JsonResponse({
-        "state": res.state,
-        "log": log_text,
-        "gata": gata,
-        "fisiere": ["vocals.wav", "drums.wav", "bass.wav", "other.wav"] if gata else []
-    })
-
-from django.http import HttpResponse
-
-def interfata_simpla(request):
-    html = """<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ro">
 <head>
     <meta charset="UTF-8">
@@ -500,11 +431,11 @@ def interfata_simpla(request):
 
 // ===== TRACK CONFIGURATION =====
 var TRACK_CFG = {
-    original: {name:'Original', icon:'\\u{1F3B5}', hue:38,  color:'#f59e0b'},
-    vocals:   {name:'Vocals',   icon:'\\u{1F3A4}', hue:275, color:'#a855f7'},
-    drums:    {name:'Drums',    icon:'\\u{1F941}', hue:348, color:'#f43f5e'},
-    bass:     {name:'Bass',     icon:'\\u{1F3B8}', hue:217, color:'#3b82f6'},
-    other:    {name:'Other',    icon:'\\u{1F3B9}', hue:160, color:'#10b981'}
+    original: {name:'Original', icon:'\u{1F3B5}', hue:38,  color:'#f59e0b'},
+    vocals:   {name:'Vocals',   icon:'\u{1F3A4}', hue:275, color:'#a855f7'},
+    drums:    {name:'Drums',    icon:'\u{1F941}', hue:348, color:'#f43f5e'},
+    bass:     {name:'Bass',     icon:'\u{1F3B8}', hue:217, color:'#3b82f6'},
+    other:    {name:'Other',    icon:'\u{1F3B9}', hue:160, color:'#10b981'}
 };
 var audioCtx = null;
 var tracks = {};
@@ -1120,7 +1051,7 @@ function formatBotMessage(text) {
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     // Italic
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    // Links — turn URLs into clickable links
+    // Links ΓÇö turn URLs into clickable links
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     // Plain URLs
     html = html.replace(/(https?:\/\/[^\s<]+)/g, function(match) {
@@ -1129,7 +1060,8 @@ function formatBotMessage(text) {
         return '<a href="' + match + '" target="_blank" rel="noopener">' + match + '</a>';
     });
     // Line breaks
-    html = html.replace(/\\n/g, '<br>');
+    html = html.replace(/
+/g, '<br>');
     return html;
 }
 
@@ -1214,155 +1146,4 @@ document.getElementById('chat-input').addEventListener('input', function() {
 });
 </script>
 </body>
-</html>"""
-    return HttpResponse(html)
-
-@api_view(['POST'])
-def signup_view(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
-    if not username or not password:
-        return Response({"eroare": "Date incomplete"}, status=400)
-    if User.objects.filter(username=username).exists():
-        return Response({"eroare": "Userul exista deja"}, status=400)
-    
-    user = User.objects.create_user(username=username, password=password)
-    
-    login(request, user)
-    
-    return Response({"mesaj": "Cont creat cu succes!"})
-
-@api_view(['POST'])
-def login_view(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
-    user = authenticate(username=username, password=password)
-    if user:
-        login(request, user)
-        return Response({"mesaj": "Logat cu succes!"})
-    return Response({"eroare": "Date invalide"}, status=401)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def incarca_melodie(request):
-    if 'file' not in request.FILES:
-        return Response({"eroare": "Lipseste fisierul"}, status=400)
-    
-    fisier = request.FILES['file']
-    melodie_db = Melodie.objects.create(
-        user=request.user,
-        titlu=fisier.name,
-        fisier_original=fisier
-    )
-    
-    from .tasks import proceseaza_melodia_task
-    folder_salvare = os.path.dirname(melodie_db.fisier_original.path)
-    task = proceseaza_melodia_task.delay(melodie_db.id, fisier.name, folder_salvare)
-    
-    return Response({"task_id": task.id, "melodie_id": melodie_db.id})
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def istoric_melodii(request):
-    melodii = Melodie.objects.filter(user=request.user).order_by('-data_incarcare')
-    rezultat = []
-    
-    for m in melodii:
-        stemuri = m.stemuri.all()
-        rezultat.append({
-            "id": m.id,
-            "titlu": m.titlu,
-            "data": m.data_incarcare.strftime("%d-%m-%Y %H:%M"),
-            "url_original": m.fisier_original.url,
-            "stemuri": [{"tip": s.tip, "url": s.fisier_stem.url} for s in stemuri]
-        })
-        
-    return Response(rezultat)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def detalii_melodie(request, melodie_id):
-    try:
-        melodie = Melodie.objects.get(id=melodie_id, user=request.user)
-    except Melodie.DoesNotExist:
-        return Response({"eroare": "Melodia nu a fost gasita"}, status=404)
-    
-    stemuri = melodie.stemuri.all()
-    return Response({
-        "id": melodie.id,
-        "titlu": melodie.titlu,
-        "url_original": melodie.fisier_original.url,
-        "stemuri": [{"tip": s.tip, "url": s.fisier_stem.url} for s in stemuri]
-    })
-
-@api_view(['POST'])
-def logout_view(request):
-    logout(request)
-    return Response({"mesaj": "Delogat cu succes!"})
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def gemini_chat(request):
-    from django.conf import settings as django_settings
-    # pyrefly: ignore [missing-import]
-    from google import genai
-
-    user_message = request.data.get('message', '')
-    song_context = request.data.get('song_context', '')
-    history = request.data.get('history', [])
-
-    if not user_message:
-        return Response({"eroare": "Mesajul lipseste"}, status=400)
-
-    api_key = django_settings.GEMINI_API_KEY
-    if not api_key:
-        return Response({"eroare": "Cheia API Gemini nu este configurata"}, status=500)
-
-    system_prompt = (
-        "Esti un asistent muzical inteligent pentru aplicatia StemComposer. "
-        "StemComposer este o aplicatie care separa melodiile in stem-uri individuale "
-        "(vocals, drums, bass, other) folosind inteligenta artificiala.\n\n"
-        "RASPUNDE INTOTDEAUNA IN LIMBA ROMANA.\n\n"
-        "Cand utilizatorul intreaba despre o melodie sau cand primesti context despre o melodie, trebuie sa:\n"
-        "1. Identifici NUMELE MELODIEI, ARTISTUL si GENUL MUZICAL\n"
-        "2. Recomanzi RESURSE ONLINE pentru partituri/sheet music pentru fiecare instrument din melodie:\n"
-        "   - Musescore (musescore.com) - partituri gratuite si premium\n"
-        "   - IMSLP (imslp.org) - partituri clasice gratuite\n"
-        "   - Musicnotes (musicnotes.com) - partituri profesionale\n"
-        "   - Ultimate Guitar (ultimate-guitar.com) - tablaturi chitara si bass\n"
-        "   - Flat.io (flat.io) - partituri interactive\n"
-        "   - SheetMusicDirect (sheetmusicdirect.com)\n"
-        "   - Songsterr (songsterr.com) - tablaturi interactive\n"
-        "3. Ofera link-uri de cautare specifice pentru fiecare instrument (vocals/voce, drums/tobe, bass, other/alte instrumente)\n\n"
-        "Formateaza raspunsurile frumos cu emoji-uri relevante si structura clara.\n"
-        "Fii prietenos, entuziast si util. Daca nu cunosti melodia exact, ofera sugestii bazate pe numele fisierului."
-    )
-
-    if song_context:
-        system_prompt += f"\n\nCONTEXT MELODIE CURENTA: {song_context}"
-
-    try:
-        client = genai.Client(api_key=api_key)
-
-        contents = []
-        for msg in history:
-            role = "user" if msg.get("role") == "user" else "model"
-            contents.append({"role": role, "parts": [{"text": msg.get("text", "")}]})
-        contents.append({"role": "user", "parts": [{"text": user_message}]})
-
-        response = client.models.generate_content(
-            model="gemini-3.1-flash-lite",
-            contents=contents,
-            config={
-                "system_instruction": system_prompt,
-                "temperature": 0.7,
-                "max_output_tokens": 2048,
-            }
-        )
-
-        reply = response.text if response.text else "Nu am putut genera un raspuns."
-        return Response({"reply": reply})
-
-    except Exception as e:
-        return Response({"eroare": f"Eroare Gemini API: {str(e)}"}, status=500)
+</html>
