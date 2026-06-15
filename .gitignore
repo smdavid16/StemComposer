@@ -43,3 +43,16 @@ dump.rdb
 *.swp
 .DS_Store
 Thumbs.db
+
+# ========================
+# 6. Static & Media (Production)
+# ========================
+staticfiles/
+media/
+
+# ========================
+# 7. Coverage & CI Artifacts
+# ========================
+htmlcov/
+.coverage
+coverage.xml
