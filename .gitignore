@@ -55,4 +55,4 @@ media/
 # ========================
 htmlcov/
 .coverage
-coverage.xml
+coverage.xml.venv_ci_test
