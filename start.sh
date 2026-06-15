@@ -25,11 +25,8 @@ echo "Aplicam migratiile bazei de date..."
 python3 manage.py makemigrations
 python3 manage.py migrate
 
-echo "Verificam imaginea Docker 'stemcomposer'..."
-if ! docker image inspect stemcomposer >/dev/null 2>&1; then
-    echo "Imaginea Docker 'stemcomposer' nu a fost gasita local. O construim acum..."
-    docker build -t stemcomposer -f dockerfile .
-fi
+echo "Verificam si construim imaginea Docker 'stemcomposer' (daca au aparut modificari)..."
+docker build -t stemcomposer -f dockerfile .
 
 echo "Pornim Celery worker..."
 celery -A core worker --loglevel=warning &
