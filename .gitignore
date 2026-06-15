@@ -43,6 +43,7 @@ dump.rdb
 *.swp
 .DS_Store
 Thumbs.db
+<<<<<<< HEAD
 
 # ========================
 # 6. Static & Media (Production)
@@ -56,3 +57,5 @@ media/
 htmlcov/
 .coverage
 coverage.xml.venv_ci_test
+venv*/
+celery.log

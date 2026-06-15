@@ -1,107 +1,4 @@
-import os
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from django.core.files.storage import FileSystemStorage
-from django.http import HttpResponse
-from .tasks import proceseaza_melodia_task
-from celery.result import AsyncResult
-from django.http import JsonResponse
-from django.http import HttpResponse
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from .models import Melodie, Stem
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def incarca_melodie(request):
-    if 'file' not in request.FILES:
-        return Response({"eroare": "Nu a fost trimis niciun fisier!"}, status=400)
-
-    fisier = request.FILES['file']
-    
-    melodie_db = Melodie.objects.create(
-        user=request.user,
-        titlu=fisier.name,
-        fisier_original=fisier
-    )
-    
-    cale_fisier_original = melodie_db.fisier_original.path
-    nume_fisier_salvat = os.path.basename(cale_fisier_original)
-    folder_salvare = os.path.dirname(cale_fisier_original)
-    
-    task = proceseaza_melodia_task.delay(melodie_db.id, nume_fisier_salvat, folder_salvare)
-    
-    return Response({
-        "task_id": task.id,
-        "melodie_id": melodie_db.id
-    })
-
-@api_view(['GET'])
-def verifica_status(request, task_id):
-    res = AsyncResult(task_id)
-    nume_fisier = request.GET.get('nume', '')
-    
-    nume_folder_piesa = nume_fisier.split('.')[0] if nume_fisier else ''
-    
-    cale_rezultate = os.path.join(os.getcwd(), 'melodii_de_procesat', 'separated', 'htdemucs', nume_folder_piesa)
-    gata = os.path.exists(cale_rezultate)
-
-    log_text = ""
-    if res.state in ['PROGRESS', 'SUCCESS', 'FAILURE']:
-        info = res.info
-        if isinstance(info, dict):
-            log_text = info.get('log', '')
-        elif isinstance(info, Exception):
-            log_text = str(info)
-        elif info:
-            log_text = str(info)
-
-    response_data = {
-        "state": res.state,
-        "log": log_text,
-        "gata": gata,
-        "fisiere": ["vocals.wav", "drums.wav", "bass.wav", "other.wav"] if gata else []
-    }
-    
-    if res.state == 'SUCCESS' and isinstance(res.info, dict):
-        extra_data = {k: v for k, v in res.info.items() if k not in ['status', 'log']}
-        response_data.update(extra_data)
-
-    return JsonResponse(response_data)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def schimba_instrument_view(request):
-    stem_id = request.data.get('stem_id')
-    target_program = request.data.get('target_program')
-    instrument_name = request.data.get('instrument_name')
-    
-    if not stem_id or target_program is None or not instrument_name:
-        return Response({"eroare": "Date incomplete!"}, status=400)
-        
-    try:
-        stem = Stem.objects.get(id=stem_id, melodie__user=request.user)
-    except Stem.DoesNotExist:
-        return Response({"eroare": "Stem-ul nu exista sau nu aveti acces la el!"}, status=404)
-        
-    from .tasks import schimba_instrument_task
-    task = schimba_instrument_task.delay(stem.id, int(target_program), instrument_name)
-    
-    return Response({
-        "task_id": task.id,
-        "mesaj": "Procesarea de schimbare a instrumentului a pornit."
-    })
-
-from django.http import HttpResponse
-from django.views.decorators.csrf import ensure_csrf_cookie
-
-@ensure_csrf_cookie
-def interfata_simpla(request):
-    html = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ro">
 <head>
     <meta charset="UTF-8">
@@ -295,219 +192,10 @@ def interfata_simpla(request):
         }
 
         #auth-msg{color:#fbbf24;font-size:13px;margin-top:8px;}
-        #sectiune-auth, #sectiune-app,#sectiune-istoric,#sectiune-player{display:none;}
-
-        /* ---- Hero Section ---- */
-        .hero{
-            text-align:center;
-            padding:80px 20px 60px;
-            max-width:800px;
-            margin:0 auto;
-            animation: fadeIn 1s ease-out;
-        }
-        .hero h1{
-            font-size:48px;
-            font-weight:700;
-            margin-bottom:16px;
-            background:linear-gradient(135deg,#a855f7,#3b82f6);
-            -webkit-background-clip:text;
-            -webkit-text-fill-color:transparent;
-            letter-spacing:-1px;
-        }
-        .hero p{
-            font-size:18px;
-            color:#94a3b8;
-            margin-bottom:32px;
-            line-height:1.6;
-        }
-        .hero-btn{
-            display:inline-block;
-            padding:16px 36px;
-            font-size:16px;
-            font-weight:600;
-            color:#fff;
-            background:linear-gradient(135deg,#a855f7,#7c3aed);
-            border:none;
-            border-radius:30px;
-            cursor:pointer;
-            box-shadow:0 8px 24px rgba(168,85,247,.4);
-            transition:all .3s ease;
-        }
-        .hero-btn:hover{
-            transform:translateY(-2px) scale(1.05);
-            box-shadow:0 12px 32px rgba(168,85,247,.6);
-        }
-        @keyframes fadeIn{
-            from{opacity:0;transform:translateY(20px);}
-            to{opacity:1;transform:translateY(0);}
-        }
-
-        /* ---- Chatbot FAB ---- */
-        .chat-fab{
-            position:fixed;bottom:28px;right:28px;z-index:9999;
-            width:60px;height:60px;border-radius:50%;border:none;
-            background:linear-gradient(135deg,#a855f7,#7c3aed);
-            color:#fff;font-size:26px;cursor:pointer;
-            box-shadow:0 6px 24px rgba(168,85,247,.4);
-            transition:all .3s ease;display:none;
-            align-items:center;justify-content:center;
-        }
-        .chat-fab:hover{transform:scale(1.1);box-shadow:0 8px 32px rgba(168,85,247,.55);}
-        .chat-fab.visible{display:flex;}
-
-        /* ---- Chatbot Panel ---- */
-        .chat-panel{
-            position:fixed;bottom:100px;right:28px;z-index:9998;
-            width:400px;max-height:560px;
-            background:rgba(14,14,26,.92);
-            border:1px solid rgba(255,255,255,.08);
-            border-radius:20px;
-            box-shadow:0 16px 64px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04);
-            backdrop-filter:blur(24px);
-            display:flex;flex-direction:column;
-            transform:translateY(20px) scale(.95);opacity:0;
-            pointer-events:none;
-            transition:transform .35s cubic-bezier(.16,1,.3,1),opacity .25s ease;
-        }
-        .chat-panel.open{
-            transform:translateY(0) scale(1);opacity:1;pointer-events:all;
-        }
-
-        .chat-header{
-            padding:18px 20px 14px;
-            border-bottom:1px solid rgba(255,255,255,.06);
-            display:flex;align-items:center;gap:12px;
-            background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(124,58,237,.05));
-            border-radius:20px 20px 0 0;
-        }
-        .chat-header-icon{
-            width:36px;height:36px;border-radius:10px;
-            background:linear-gradient(135deg,#a855f7,#7c3aed);
-            display:flex;align-items:center;justify-content:center;
-            font-size:18px;flex-shrink:0;
-        }
-        .chat-header-info{flex:1;}
-        .chat-header-title{font-size:15px;font-weight:700;color:#f1f5f9;}
-        .chat-header-sub{font-size:11px;color:#64748b;margin-top:1px;}
-        .chat-close{
-            width:32px;height:32px;border-radius:8px;border:none;
-            background:rgba(255,255,255,.05);color:#94a3b8;
-            font-size:16px;cursor:pointer;transition:all .2s;
-            display:flex;align-items:center;justify-content:center;
-        }
-        .chat-close:hover{background:rgba(255,255,255,.1);color:#f1f5f9;}
-
-        /* ---- Chat Messages ---- */
-        .chat-messages{
-            flex:1;overflow-y:auto;padding:16px;
-            display:flex;flex-direction:column;gap:10px;
-            min-height:300px;max-height:360px;
-            scrollbar-width:thin;
-            scrollbar-color:rgba(255,255,255,.08) transparent;
-        }
-        .chat-messages::-webkit-scrollbar{width:5px;}
-        .chat-messages::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px;}
-
-        .chat-msg{
-            max-width:85%;padding:10px 14px;border-radius:14px;
-            font-size:13px;line-height:1.55;
-            animation:msgSlide .3s ease;
-            word-wrap:break-word;
-        }
-        .chat-msg a{color:#c4b5fd;text-decoration:underline;}
-        .chat-msg a:hover{color:#e9d5ff;}
-        @keyframes msgSlide{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-
-        .chat-msg.user{
-            align-self:flex-end;
-            background:linear-gradient(135deg,#7c3aed,#6d28d9);
-            color:#f1f5f9;border-bottom-right-radius:4px;
-        }
-        .chat-msg.bot{
-            align-self:flex-start;
-            background:rgba(255,255,255,.06);
-            color:#e2e8f0;border-bottom-left-radius:4px;
-            border:1px solid rgba(255,255,255,.04);
-        }
-        .chat-msg.bot strong{color:#c4b5fd;}
-        .chat-msg.system{
-            align-self:center;
-            background:rgba(168,85,247,.08);
-            color:#a78bfa;font-size:12px;
-            border:1px solid rgba(168,85,247,.12);
-            text-align:center;max-width:95%;
-        }
-
-        /* ---- Typing Indicator ---- */
-        .typing-indicator{
-            display:flex;gap:4px;align-items:center;
-            padding:10px 16px;align-self:flex-start;
-        }
-        .typing-dot{
-            width:7px;height:7px;border-radius:50%;
-            background:#a855f7;
-            animation:typingBounce 1.4s ease-in-out infinite;
-        }
-        .typing-dot:nth-child(2){animation-delay:.2s;}
-        .typing-dot:nth-child(3){animation-delay:.4s;}
-        @keyframes typingBounce{
-            0%,60%,100%{transform:translateY(0);opacity:.4;}
-            30%{transform:translateY(-6px);opacity:1;}
-        }
-
-        /* ---- Chat Input ---- */
-        .chat-input-area{
-            padding:12px 14px;
-            border-top:1px solid rgba(255,255,255,.06);
-            display:flex;gap:8px;align-items:center;
-        }
-        .chat-input{
-            flex:1;padding:10px 14px;
-            background:rgba(255,255,255,.05);color:#e2e8f0;
-            border:1px solid rgba(255,255,255,.08);border-radius:12px;
-            font-family:inherit;font-size:13px;
-            outline:none;transition:border-color .2s,box-shadow .2s;
-            resize:none;max-height:80px;
-        }
-        .chat-input:focus{
-            border-color:rgba(168,85,247,.4);
-            box-shadow:0 0 0 3px rgba(168,85,247,.08);
-        }
-        .chat-input::placeholder{color:#4a5568;}
-        .chat-send{
-            width:38px;height:38px;border-radius:10px;border:none;
-            background:linear-gradient(135deg,#a855f7,#7c3aed);
-            color:#fff;font-size:16px;cursor:pointer;
-            transition:all .2s;flex-shrink:0;
-            display:flex;align-items:center;justify-content:center;
-        }
-        .chat-send:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(168,85,247,.35);}
-        .chat-send:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
-
-        /* ---- Song context badge ---- */
-        .chat-song-badge{
-            display:none;padding:6px 12px;margin:0 14px 4px;
-            background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.08));
-            border:1px solid rgba(245,158,11,.15);border-radius:8px;
-            font-size:11px;color:#fbbf24;
-            align-items:center;gap:6px;
-        }
-        .chat-song-badge.active{display:flex;}
-
-        @media(max-width:500px){
-            .chat-panel{width:calc(100vw - 20px);right:10px;bottom:90px;max-height:70vh;}
-            .chat-fab{bottom:16px;right:16px;width:52px;height:52px;font-size:22px;}
-        }
+        #sectiune-app,#sectiune-istoric,#sectiune-player{display:none;}
     </style>
 </head>
 <body>
-
-    <!-- ========== HERO / LANDING PAGE ========== -->
-    <div class="hero" id="sectiune-hero">
-        <h1>Deconstruct to Recompose.</h1>
-        <p>Extrage voci, tobe, bas si instrumente din orice melodie folosind inteligenta artificiala de ultima generatie.<br>Studio-ul tau complet de mixaj, direct in browser.</p>
-        <button class="hero-btn" onclick="arataAuth()">Incepe acum</button>
-    </div>
 
     <!-- ========== AUTH ========== -->
     <div class="card" id="sectiune-auth">
@@ -552,33 +240,6 @@ def interfata_simpla(request):
         <div id="lista-istoric"></div>
     </div>
 
-    <!-- ========== CHATBOT FAB ========== -->
-    <button class="chat-fab" id="chat-fab" onclick="toggleChat()">&#129302;</button>
-
-    <!-- ========== CHATBOT PANEL ========== -->
-    <div class="chat-panel" id="chat-panel">
-        <div class="chat-header">
-            <div class="chat-header-icon">&#129302;</div>
-            <div class="chat-header-info">
-                <div class="chat-header-title">Asistent Muzical AI</div>
-                <div class="chat-header-sub">Powered by Google Gemini</div>
-            </div>
-            <button class="chat-close" onclick="toggleChat()">&#10005;</button>
-        </div>
-        <div class="chat-song-badge" id="chat-song-badge">
-            &#127925; <span id="chat-song-name">Nicio melodie incarcata</span>
-        </div>
-        <div class="chat-messages" id="chat-messages">
-            <div class="chat-msg system">
-                &#127925; Salut! Sunt asistentul tau muzical. Incarca o melodie si intreaba-ma despre gen, artist sau unde gasesti partituri!
-            </div>
-        </div>
-        <div class="chat-input-area">
-            <textarea class="chat-input" id="chat-input" placeholder="Scrie un mesaj..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
-            <button class="chat-send" id="chat-send" onclick="sendChatMessage()">&#10148;</button>
-        </div>
-    </div>
-
 <script>
 /* ================================================================
    STEMCOMPOSER PRO  -  Audio Player + Spectrogram Visualization
@@ -586,11 +247,11 @@ def interfata_simpla(request):
 
 // ===== TRACK CONFIGURATION =====
 var TRACK_CFG = {
-    original: {name:'Original', icon:'\\u{1F3B5}', hue:38,  color:'#f59e0b'},
-    vocals:   {name:'Vocals',   icon:'\\u{1F3A4}', hue:275, color:'#a855f7'},
-    drums:    {name:'Drums',    icon:'\\u{1F941}', hue:348, color:'#f43f5e'},
-    bass:     {name:'Bass',     icon:'\\u{1F3B8}', hue:217, color:'#3b82f6'},
-    other:    {name:'Other',    icon:'\\u{1F3B9}', hue:160, color:'#10b981'}
+    original: {name:'Original', icon:'\u{1F3B5}', hue:38,  color:'#f59e0b'},
+    vocals:   {name:'Vocals',   icon:'\u{1F3A4}', hue:275, color:'#a855f7'},
+    drums:    {name:'Drums',    icon:'\u{1F941}', hue:348, color:'#f43f5e'},
+    bass:     {name:'Bass',     icon:'\u{1F3B8}', hue:217, color:'#3b82f6'},
+    other:    {name:'Other',    icon:'\u{1F3B9}', hue:160, color:'#10b981'}
 };
 var audioCtx = null;
 var tracks = {};
@@ -743,7 +404,6 @@ function deschidePlayer(melodieId) {
 
         document.getElementById('sectiune-player').style.display = 'block';
         document.getElementById('player-titlu').innerText = data.titlu;
-        setChatSongContext(data.titlu);
 
         var originalStems = {};
         var transformedStems = {};
@@ -896,7 +556,7 @@ function deschidePlayer(melodieId) {
                         
                         lanseazaConversie(melodieId, currentStemId, instVal, instLabel, t.id);
                     } catch (err) {
-                        alert("Eroare JavaScript la click pe Schimbă:\\n" + err.message + "\\n\\nStack:\\n" + err.stack);
+                        alert("Eroare JavaScript la click pe Schimbă:\n" + err.message + "\n\nStack:\n" + err.stack);
                     }
                 });
             }
@@ -920,7 +580,8 @@ function lanseazaConversie(melodieId, stemId, targetProgram, instrumentName, tra
     var consoleDiv = document.getElementById('console');
     consoleDiv.style.display = 'block';
     consoleDiv.style.color = '#22c55e';
-    consoleDiv.innerText = 'Se trimite cererea de conversie pentru ' + TRACK_CFG[trackId].name + ' -> ' + instrumentName + '...\\n(Procesarea pe CPU durează în jur de 1-3 minute, te rugăm să aștepți)';
+    consoleDiv.innerText = 'Se trimite cererea de conversie pentru ' + TRACK_CFG[trackId].name + ' -> ' + instrumentName + '...
+(Procesarea pe CPU durează în jur de 1-3 minute, te rugăm să aștepți)';
     
     var btn = document.getElementById('btn-transform-' + trackId);
     if (btn) {
@@ -959,7 +620,8 @@ function lanseazaConversie(melodieId, stemId, targetProgram, instrumentName, tra
     })
     .then(function(data) {
         if (data.eroare) throw new Error(data.eroare);
-        consoleDiv.innerText = 'Conversia a pornit. Se proceseaza cu Basic Pitch si FluidSynth...\\n(Durată estimată: 1-3 minute. Te rugăm să nu mai apeși din nou butonul)';
+        consoleDiv.innerText = 'Conversia a pornit. Se proceseaza cu Basic Pitch si FluidSynth...
+(Durată estimată: 1-3 minute. Te rugăm să nu mai apeși din nou butonul)';
         
         var interval = setInterval(function() {
             fetch('/api/status/' + data.task_id + '/')
@@ -1111,7 +773,6 @@ function inchidePlayer() {
     tracks = {};
     document.getElementById('sectiune-player').style.display = 'none';
     document.getElementById('global-controls').style.display = 'none';
-    setChatSongContext('');
 }
 
 // ===== ANIMATION LOOP =====
@@ -1232,17 +893,16 @@ function auth(url) {
             document.getElementById('sectiune-auth').style.display = 'none';
             document.getElementById('sectiune-app').style.display = 'block';
             document.getElementById('sectiune-istoric').style.display = 'block';
-            showChatFab();
             incarcaIstoric();
         })
         .catch(function(err) {
             msgEl.style.color = '#f43f5e';
             msgEl.innerText = err.message;
             console.error("Auth error:", err);
-            alert("Eroare autentificare:\\n" + err.message);
+            alert("Eroare autentificare:\n" + err.message);
         });
     } catch (e) {
-        alert("Eroare in scriptul de login:\\n" + e.message);
+        alert("Eroare in scriptul de login:\n" + e.message);
     }
 }
 
@@ -1261,15 +921,7 @@ function delogare() {
         document.getElementById('lista-istoric').innerHTML = '';
         stopAll();
         tracks = {};
-        hideChatFab();
-        setChatSongContext('');
-        chatHistory = [];
     });
-}
-
-function arataAuth() {
-    document.getElementById('sectiune-hero').style.display = 'none';
-    document.getElementById('sectiune-auth').style.display = 'block';
 }
 
 // ===== ISTORIC =====
@@ -1365,331 +1017,6 @@ function getCookie(name) {
     }
     return val;
 }
-
-// ===== CHATBOT =====
-var chatHistory = [];
-var chatOpen = false;
-var currentSongTitle = '';
-
-function toggleChat() {
-    chatOpen = !chatOpen;
-    var panel = document.getElementById('chat-panel');
-    if (chatOpen) {
-        panel.classList.add('open');
-        document.getElementById('chat-input').focus();
-        var msgs = document.getElementById('chat-messages');
-        msgs.scrollTop = msgs.scrollHeight;
-    } else {
-        panel.classList.remove('open');
-    }
-}
-
-function showChatFab() {
-    document.getElementById('chat-fab').classList.add('visible');
-}
-
-function hideChatFab() {
-    document.getElementById('chat-fab').classList.remove('visible');
-    var panel = document.getElementById('chat-panel');
-    panel.classList.remove('open');
-    chatOpen = false;
-}
-
-function setChatSongContext(title) {
-    currentSongTitle = title || '';
-    var badge = document.getElementById('chat-song-badge');
-    var nameEl = document.getElementById('chat-song-name');
-    if (currentSongTitle) {
-        nameEl.innerText = currentSongTitle;
-        badge.classList.add('active');
-    } else {
-        badge.classList.remove('active');
-    }
-}
-
-function addChatMessage(text, type) {
-    var msgs = document.getElementById('chat-messages');
-    var div = document.createElement('div');
-    div.className = 'chat-msg ' + type;
-
-    if (type === 'bot') {
-        div.innerHTML = formatBotMessage(text);
-    } else {
-        div.textContent = text;
-    }
-
-    msgs.appendChild(div);
-    msgs.scrollTop = msgs.scrollHeight;
-}
-
-function formatBotMessage(text) {
-    // Basic markdown-like formatting
-    var html = text;
-    // Bold
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    // Italic
-    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    // Links — turn URLs into clickable links
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-    // Plain URLs
-    html = html.replace(/(https?:\/\/[^\s<]+)/g, function(match) {
-        // Don't double-wrap already linked URLs
-        if (html.indexOf('href="' + match) !== -1) return match;
-        return '<a href="' + match + '" target="_blank" rel="noopener">' + match + '</a>';
-    });
-    // Line breaks
-    html = html.replace(/\\n/g, '<br>');
-    return html;
-}
-
-function showTypingIndicator() {
-    var msgs = document.getElementById('chat-messages');
-    var div = document.createElement('div');
-    div.className = 'typing-indicator';
-    div.id = 'typing-indicator';
-    div.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
-    msgs.appendChild(div);
-    msgs.scrollTop = msgs.scrollHeight;
-}
-
-function removeTypingIndicator() {
-    var el = document.getElementById('typing-indicator');
-    if (el) el.remove();
-}
-
-function sendChatMessage() {
-    var input = document.getElementById('chat-input');
-    var message = input.value.trim();
-    if (!message) return;
-
-    var sendBtn = document.getElementById('chat-send');
-    sendBtn.disabled = true;
-    input.value = '';
-    input.style.height = 'auto';
-
-    addChatMessage(message, 'user');
-    showTypingIndicator();
-
-    var songCtx = '';
-    if (currentSongTitle) {
-        songCtx = 'Melodia incarcata in player: "' + currentSongTitle + '". Stem-urile disponibile: vocals, drums, bass, other.';
-    }
-
-    var csrf = getCookie('csrftoken');
-
-    fetch('/api/chat/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrf
-        },
-        body: JSON.stringify({
-            message: message,
-            song_context: songCtx,
-            history: chatHistory
-        })
-    })
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
-        removeTypingIndicator();
-        sendBtn.disabled = false;
-
-        if (data.reply) {
-            chatHistory.push({role: 'user', text: message});
-            chatHistory.push({role: 'bot', text: data.reply});
-            // Keep history manageable (last 20 messages)
-            if (chatHistory.length > 20) {
-                chatHistory = chatHistory.slice(chatHistory.length - 20);
-            }
-            addChatMessage(data.reply, 'bot');
-        } else if (data.eroare) {
-            addChatMessage('Eroare: ' + data.eroare, 'system');
-        }
-
-        input.focus();
-    })
-    .catch(function(err) {
-        removeTypingIndicator();
-        sendBtn.disabled = false;
-        addChatMessage('Eroare de conexiune: ' + err.message, 'system');
-        input.focus();
-    });
-}
-
-// Auto-resize textarea
-document.getElementById('chat-input').addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 80) + 'px';
-});
 </script>
 </body>
-</html>"""
-    return HttpResponse(html)
-
-@api_view(['POST'])
-def signup_view(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
-    if not username or not password:
-        return Response({"eroare": "Date incomplete"}, status=400)
-    if User.objects.filter(username=username).exists():
-        return Response({"eroare": "Userul exista deja"}, status=400)
-    
-    user = User.objects.create_user(username=username, password=password)
-    
-    login(request, user)
-    
-    return Response({"mesaj": "Cont creat cu succes!"})
-
-@api_view(['POST'])
-def login_view(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
-    user = authenticate(username=username, password=password)
-    if user:
-        login(request, user)
-        return Response({"mesaj": "Logat cu succes!"})
-    return Response({"eroare": "Date invalide"}, status=401)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def incarca_melodie(request):
-    if 'file' not in request.FILES:
-        return Response({"eroare": "Lipseste fisierul"}, status=400)
-    
-    fisier = request.FILES['file']
-    melodie_db = Melodie.objects.create(
-        user=request.user,
-        titlu=fisier.name,
-        fisier_original=fisier
-    )
-    
-    from .tasks import proceseaza_melodia_task
-    folder_salvare = os.path.dirname(melodie_db.fisier_original.path)
-    task = proceseaza_melodia_task.delay(melodie_db.id, fisier.name, folder_salvare)
-    
-    return Response({"task_id": task.id, "melodie_id": melodie_db.id})
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def istoric_melodii(request):
-    melodii = Melodie.objects.filter(user=request.user).order_by('-data_incarcare')
-    rezultat = []
-    
-    for m in melodii:
-        stemuri = m.stemuri.all()
-        rezultat.append({
-            "id": m.id,
-            "titlu": m.titlu,
-            "data": m.data_incarcare.strftime("%d-%m-%Y %H:%M"),
-            "url_original": m.fisier_original.url,
-            "stemuri": [
-                {
-                    "tip": s.tip,
-                    "url": s.fisier_stem.url,
-                    "este_transformat": s.este_transformat,
-                    "instrument_tinta": s.instrument_tinta
-                }
-                for s in stemuri
-            ]
-        })
-        
-    return Response(rezultat)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def detalii_melodie(request, melodie_id):
-    try:
-        melodie = Melodie.objects.get(id=melodie_id, user=request.user)
-    except Melodie.DoesNotExist:
-        return Response({"eroare": "Melodia nu a fost gasita"}, status=404)
-    
-    stemuri = melodie.stemuri.all()
-    return Response({
-        "id": melodie.id,
-        "titlu": melodie.titlu,
-        "url_original": melodie.fisier_original.url,
-        "stemuri": [
-            {
-                "id": s.id,
-                "tip": s.tip,
-                "url": s.fisier_stem.url,
-                "este_transformat": s.este_transformat,
-                "instrument_tinta": s.instrument_tinta,
-                "stem_parinte_id": s.stem_parinte_id
-            }
-            for s in stemuri
-        ]
-    })
-
-@api_view(['POST'])
-def logout_view(request):
-    logout(request)
-    return Response({"mesaj": "Delogat cu succes!"})
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def gemini_chat(request):
-    from django.conf import settings as django_settings
-    # pyrefly: ignore [missing-import]
-    from google import genai
-
-    user_message = request.data.get('message', '')
-    song_context = request.data.get('song_context', '')
-    history = request.data.get('history', [])
-
-    if not user_message:
-        return Response({"eroare": "Mesajul lipseste"}, status=400)
-
-    api_key = django_settings.GEMINI_API_KEY
-    if not api_key:
-        return Response({"eroare": "Cheia API Gemini nu este configurata"}, status=500)
-
-    system_prompt = (
-        "Esti un asistent muzical inteligent pentru aplicatia StemComposer. "
-        "StemComposer este o aplicatie care separa melodiile in stem-uri individuale "
-        "(vocals, drums, bass, other) folosind inteligenta artificiala.\n\n"
-        "RASPUNDE INTOTDEAUNA IN LIMBA ROMANA.\n\n"
-        "Cand utilizatorul intreaba despre o melodie sau cand primesti context despre o melodie, trebuie sa:\n"
-        "1. Identifici NUMELE MELODIEI, ARTISTUL si GENUL MUZICAL\n"
-        "2. Recomanzi RESURSE ONLINE pentru partituri/sheet music pentru fiecare instrument din melodie:\n"
-        "   - Musescore (musescore.com) - partituri gratuite si premium\n"
-        "   - IMSLP (imslp.org) - partituri clasice gratuite\n"
-        "   - Musicnotes (musicnotes.com) - partituri profesionale\n"
-        "   - Ultimate Guitar (ultimate-guitar.com) - tablaturi chitara si bass\n"
-        "   - Flat.io (flat.io) - partituri interactive\n"
-        "   - SheetMusicDirect (sheetmusicdirect.com)\n"
-        "   - Songsterr (songsterr.com) - tablaturi interactive\n"
-        "3. Ofera link-uri de cautare specifice pentru fiecare instrument (vocals/voce, drums/tobe, bass, other/alte instrumente)\n\n"
-        "Formateaza raspunsurile frumos cu emoji-uri relevante si structura clara.\n"
-        "Fii prietenos, entuziast si util. Daca nu cunosti melodia exact, ofera sugestii bazate pe numele fisierului."
-    )
-
-    if song_context:
-        system_prompt += f"\n\nCONTEXT MELODIE CURENTA: {song_context}"
-
-    try:
-        client = genai.Client(api_key=api_key)
-
-        contents = []
-        for msg in history:
-            role = "user" if msg.get("role") == "user" else "model"
-            contents.append({"role": role, "parts": [{"text": msg.get("text", "")}]})
-        contents.append({"role": "user", "parts": [{"text": user_message}]})
-
-        response = client.models.generate_content(
-            model="gemini-3.1-flash-lite",
-            contents=contents,
-            config={
-                "system_instruction": system_prompt,
-                "temperature": 0.7,
-                "max_output_tokens": 2048,
-            }
-        )
-
-        reply = response.text if response.text else "Nu am putut genera un raspuns."
-        return Response({"reply": reply})
-
-    except Exception as e:
-        return Response({"eroare": f"Eroare Gemini API: {str(e)}"}, status=500)
+</html>

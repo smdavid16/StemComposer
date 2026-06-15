@@ -18,8 +18,15 @@ class Stem(models.Model):
         ('other', 'Other'),
     ]
     melodie = models.ForeignKey(Melodie, on_delete=models.CASCADE, related_name='stemuri')
-    tip = models.CharField(max_length=10, choices=TIPURI_STEM)
+    tip = models.CharField(max_length=20, choices=TIPURI_STEM)
     fisier_stem = models.FileField(upload_to='separated/')
+    
+    # Câmpuri noi pentru instrumente modificate
+    este_transformat = models.BooleanField(default=False)
+    instrument_tinta = models.CharField(max_length=50, null=True, blank=True)
+    stem_parinte = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='transformari')
 
     def __str__(self):
+        if self.este_transformat:
+            return f"{self.instrument_tinta} (transformat din {self.tip}) pentru {self.melodie.titlu}"
         return f"{self.tip} pentru {self.melodie.titlu}"
