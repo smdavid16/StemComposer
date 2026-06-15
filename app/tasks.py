@@ -12,47 +12,52 @@ def are_nvidia_gpu():
 
 @shared_task(bind=True)
 def proceseaza_melodia_task(self, melodie_id, nume_fisier, cale_folder_melodii):
-    cale_abs = os.path.abspath(cale_folder_melodii)
-    
-    comanda = ["docker", "run", "--rm"]
-    
-    if are_nvidia_gpu():
-        comanda.extend(["--gpus", "all"])
-    
-    comanda.extend([
-        "-v", f"{cale_abs}:/app",
-        "stemcomposer",
-        "demucs",
-        nume_fisier
-    ])
-    
     try:
-        proces = subprocess.Popen(comanda, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    except FileNotFoundError as e:
-        raise Exception("Eroare: Comanda 'docker' nu a fost gasita. Asigura-te ca Docker Desktop este pornit si ca integrarea cu distributia de WSL este activata in setarile Docker Desktop (Settings -> Resources -> WSL integration).")
-    except Exception as e:
-        raise Exception(f"Eroare la pornirea procesului docker: {str(e)}")
-    
-    log_complet = ""
-    for linie in proces.stdout:
-        log_complet += linie
-        self.update_state(state='PROGRESS', meta={'log': log_complet})
+        cale_abs = os.path.abspath(cale_folder_melodii)
         
-    proces.wait()
-    
-    if proces.returncode == 0:
-        from .models import Melodie, Stem
-        melodie_db = Melodie.objects.get(id=melodie_id)
-        nume_folder = nume_fisier.split('.')[0]
+        comanda = ["docker", "run", "--rm"]
         
-        tipuri = ['vocals', 'drums', 'bass', 'other']
-        for t in tipuri:
-            cale_relativa = f"originale/separated/htdemucs/{nume_folder}/{t}.wav"
-            Stem.objects.create(melodie=melodie_db, tip=t, fisier_stem=cale_relativa)
+        if are_nvidia_gpu():
+            comanda.extend(["--gpus", "all"])
+        
+        comanda.extend([
+            "-v", f"{cale_abs}:/app",
+            "stemcomposer",
+            "demucs",
+            nume_fisier
+        ])
+        
+        try:
+            proces = subprocess.Popen(comanda, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        except FileNotFoundError as e:
+            raise Exception("Eroare: Comanda 'docker' nu a fost gasita. Asigura-te ca Docker Desktop este pornit si ca integrarea cu distributia de WSL este activata in setarile Docker Desktop (Settings -> Resources -> WSL integration).")
+        except Exception as e:
+            raise Exception(f"Eroare la pornirea procesului docker: {str(e)}")
+        
+        log_complet = ""
+        for linie in proces.stdout:
+            log_complet += linie
+            self.update_state(state='PROGRESS', meta={'log': log_complet})
             
-        return {'status': 'Succes', 'log': log_complet}
-    else:
-        raise Exception(log_complet)
+        proces.wait()
+        
+        if proces.returncode == 0:
+            from .models import Melodie, Stem
+            melodie_db = Melodie.objects.get(id=melodie_id)
+            nume_folder = nume_fisier.split('.')[0]
+            
+            tipuri = ['vocals', 'drums', 'bass', 'other']
+            for t in tipuri:
+                cale_relativa = f"originale/separated/htdemucs/{nume_folder}/{t}.wav"
+                Stem.objects.create(melodie=melodie_db, tip=t, fisier_stem=cale_relativa)
+                
+            return {'status': 'Succes', 'log': log_complet}
+        else:
+            raise Exception(log_complet)
+    except Exception as e:
+        from .models import Melodie
+        Melodie.objects.filter(id=melodie_id).delete()
+        raise e
 
 @shared_task(bind=True)
 def schimba_instrument_task(self, stem_id, target_program, instrument_name):
