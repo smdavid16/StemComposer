@@ -261,7 +261,52 @@ def interfata_simpla(request):
         }
 
         #auth-msg{color:#fbbf24;font-size:13px;margin-top:8px;}
-        #sectiune-app,#sectiune-istoric,#sectiune-player{display:none;}
+        #sectiune-auth, #sectiune-app,#sectiune-istoric,#sectiune-player{display:none;}
+
+        /* ---- Hero Section ---- */
+        .hero{
+            text-align:center;
+            padding:80px 20px 60px;
+            max-width:800px;
+            margin:0 auto;
+            animation: fadeIn 1s ease-out;
+        }
+        .hero h1{
+            font-size:48px;
+            font-weight:700;
+            margin-bottom:16px;
+            background:linear-gradient(135deg,#a855f7,#3b82f6);
+            -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent;
+            letter-spacing:-1px;
+        }
+        .hero p{
+            font-size:18px;
+            color:#94a3b8;
+            margin-bottom:32px;
+            line-height:1.6;
+        }
+        .hero-btn{
+            display:inline-block;
+            padding:16px 36px;
+            font-size:16px;
+            font-weight:600;
+            color:#fff;
+            background:linear-gradient(135deg,#a855f7,#7c3aed);
+            border:none;
+            border-radius:30px;
+            cursor:pointer;
+            box-shadow:0 8px 24px rgba(168,85,247,.4);
+            transition:all .3s ease;
+        }
+        .hero-btn:hover{
+            transform:translateY(-2px) scale(1.05);
+            box-shadow:0 12px 32px rgba(168,85,247,.6);
+        }
+        @keyframes fadeIn{
+            from{opacity:0;transform:translateY(20px);}
+            to{opacity:1;transform:translateY(0);}
+        }
 
         /* ---- Chatbot FAB ---- */
         .chat-fab{
@@ -422,6 +467,13 @@ def interfata_simpla(request):
     </style>
 </head>
 <body>
+
+    <!-- ========== HERO / LANDING PAGE ========== -->
+    <div class="hero" id="sectiune-hero">
+        <h1>Deconstruct to Recompose.</h1>
+        <p>Extrage voci, tobe, bas si instrumente din orice melodie folosind inteligenta artificiala de ultima generatie.<br>Studio-ul tau complet de mixaj, direct in browser.</p>
+        <button class="hero-btn" onclick="arataAuth()">Incepe acum</button>
+    </div>
 
     <!-- ========== AUTH ========== -->
     <div class="card" id="sectiune-auth">
@@ -961,6 +1013,11 @@ function delogare() {
         setChatSongContext('');
         chatHistory = [];
     });
+}
+
+function arataAuth() {
+    document.getElementById('sectiune-hero').style.display = 'none';
+    document.getElementById('sectiune-auth').style.display = 'block';
 }
 
 // ===== ISTORIC =====
