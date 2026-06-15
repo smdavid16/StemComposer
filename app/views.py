@@ -1551,24 +1551,7 @@ def login_view(request):
         return Response({"mesaj": "Logat cu succes!"})
     return Response({"eroare": "Date invalide"}, status=401)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def incarca_melodie(request):
-    if 'file' not in request.FILES:
-        return Response({"eroare": "Lipseste fisierul"}, status=400)
-    
-    fisier = request.FILES['file']
-    melodie_db = Melodie.objects.create(
-        user=request.user,
-        titlu=fisier.name,
-        fisier_original=fisier
-    )
-    
-    from .tasks import proceseaza_melodia_task
-    folder_salvare = os.path.dirname(melodie_db.fisier_original.path)
-    task = proceseaza_melodia_task.delay(melodie_db.id, fisier.name, folder_salvare)
-    
-    return Response({"task_id": task.id, "melodie_id": melodie_db.id})
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
