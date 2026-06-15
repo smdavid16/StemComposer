@@ -43,3 +43,8 @@ dump.rdb
 *.swp
 .DS_Store
 Thumbs.db
+venv/
+venv*/
+__pycache__/
+db.sqlite3
+celery.log

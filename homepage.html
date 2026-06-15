@@ -1,107 +1,4 @@
-import os
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from django.core.files.storage import FileSystemStorage
-from django.http import HttpResponse
-from .tasks import proceseaza_melodia_task
-from celery.result import AsyncResult
-from django.http import JsonResponse
-from django.http import HttpResponse
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from .models import Melodie, Stem
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def incarca_melodie(request):
-    if 'file' not in request.FILES:
-        return Response({"eroare": "Nu a fost trimis niciun fisier!"}, status=400)
-
-    fisier = request.FILES['file']
-    
-    melodie_db = Melodie.objects.create(
-        user=request.user,
-        titlu=fisier.name,
-        fisier_original=fisier
-    )
-    
-    cale_fisier_original = melodie_db.fisier_original.path
-    nume_fisier_salvat = os.path.basename(cale_fisier_original)
-    folder_salvare = os.path.dirname(cale_fisier_original)
-    
-    task = proceseaza_melodia_task.delay(melodie_db.id, nume_fisier_salvat, folder_salvare)
-    
-    return Response({
-        "task_id": task.id,
-        "melodie_id": melodie_db.id
-    })
-
-@api_view(['GET'])
-def verifica_status(request, task_id):
-    res = AsyncResult(task_id)
-    nume_fisier = request.GET.get('nume', '')
-    
-    nume_folder_piesa = nume_fisier.split('.')[0] if nume_fisier else ''
-    
-    cale_rezultate = os.path.join(os.getcwd(), 'melodii_de_procesat', 'separated', 'htdemucs', nume_folder_piesa)
-    gata = os.path.exists(cale_rezultate)
-
-    log_text = ""
-    if res.state in ['PROGRESS', 'SUCCESS', 'FAILURE']:
-        info = res.info
-        if isinstance(info, dict):
-            log_text = info.get('log', '')
-        elif isinstance(info, Exception):
-            log_text = str(info)
-        elif info:
-            log_text = str(info)
-
-    response_data = {
-        "state": res.state,
-        "log": log_text,
-        "gata": gata,
-        "fisiere": ["vocals.wav", "drums.wav", "bass.wav", "other.wav"] if gata else []
-    }
-    
-    if res.state == 'SUCCESS' and isinstance(res.info, dict):
-        extra_data = {k: v for k, v in res.info.items() if k not in ['status', 'log']}
-        response_data.update(extra_data)
-
-    return JsonResponse(response_data)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def schimba_instrument_view(request):
-    stem_id = request.data.get('stem_id')
-    target_program = request.data.get('target_program')
-    instrument_name = request.data.get('instrument_name')
-    
-    if not stem_id or target_program is None or not instrument_name:
-        return Response({"eroare": "Date incomplete!"}, status=400)
-        
-    try:
-        stem = Stem.objects.get(id=stem_id, melodie__user=request.user)
-    except Stem.DoesNotExist:
-        return Response({"eroare": "Stem-ul nu exista sau nu aveti acces la el!"}, status=404)
-        
-    from .tasks import schimba_instrument_task
-    task = schimba_instrument_task.delay(stem.id, int(target_program), instrument_name)
-    
-    return Response({
-        "task_id": task.id,
-        "mesaj": "Procesarea de schimbare a instrumentului a pornit."
-    })
-
-from django.http import HttpResponse
-from django.views.decorators.csrf import ensure_csrf_cookie
-
-@ensure_csrf_cookie
-def interfata_simpla(request):
-    html = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ro">
 <head>
     <meta charset="UTF-8">
@@ -350,11 +247,11 @@ def interfata_simpla(request):
 
 // ===== TRACK CONFIGURATION =====
 var TRACK_CFG = {
-    original: {name:'Original', icon:'\\u{1F3B5}', hue:38,  color:'#f59e0b'},
-    vocals:   {name:'Vocals',   icon:'\\u{1F3A4}', hue:275, color:'#a855f7'},
-    drums:    {name:'Drums',    icon:'\\u{1F941}', hue:348, color:'#f43f5e'},
-    bass:     {name:'Bass',     icon:'\\u{1F3B8}', hue:217, color:'#3b82f6'},
-    other:    {name:'Other',    icon:'\\u{1F3B9}', hue:160, color:'#10b981'}
+    original: {name:'Original', icon:'\u{1F3B5}', hue:38,  color:'#f59e0b'},
+    vocals:   {name:'Vocals',   icon:'\u{1F3A4}', hue:275, color:'#a855f7'},
+    drums:    {name:'Drums',    icon:'\u{1F941}', hue:348, color:'#f43f5e'},
+    bass:     {name:'Bass',     icon:'\u{1F3B8}', hue:217, color:'#3b82f6'},
+    other:    {name:'Other',    icon:'\u{1F3B9}', hue:160, color:'#10b981'}
 };
 var audioCtx = null;
 var tracks = {};
@@ -659,7 +556,7 @@ function deschidePlayer(melodieId) {
                         
                         lanseazaConversie(melodieId, currentStemId, instVal, instLabel, t.id);
                     } catch (err) {
-                        alert("Eroare JavaScript la click pe Schimbă:\\n" + err.message + "\\n\\nStack:\\n" + err.stack);
+                        alert("Eroare JavaScript la click pe Schimbă:\n" + err.message + "\n\nStack:\n" + err.stack);
                     }
                 });
             }
@@ -683,7 +580,8 @@ function lanseazaConversie(melodieId, stemId, targetProgram, instrumentName, tra
     var consoleDiv = document.getElementById('console');
     consoleDiv.style.display = 'block';
     consoleDiv.style.color = '#22c55e';
-    consoleDiv.innerText = 'Se trimite cererea de conversie pentru ' + TRACK_CFG[trackId].name + ' -> ' + instrumentName + '...\\n(Procesarea pe CPU durează în jur de 1-3 minute, te rugăm să aștepți)';
+    consoleDiv.innerText = 'Se trimite cererea de conversie pentru ' + TRACK_CFG[trackId].name + ' -> ' + instrumentName + '...
+(Procesarea pe CPU durează în jur de 1-3 minute, te rugăm să aștepți)';
     
     var btn = document.getElementById('btn-transform-' + trackId);
     if (btn) {
@@ -722,7 +620,8 @@ function lanseazaConversie(melodieId, stemId, targetProgram, instrumentName, tra
     })
     .then(function(data) {
         if (data.eroare) throw new Error(data.eroare);
-        consoleDiv.innerText = 'Conversia a pornit. Se proceseaza cu Basic Pitch si FluidSynth...\\n(Durată estimată: 1-3 minute. Te rugăm să nu mai apeși din nou butonul)';
+        consoleDiv.innerText = 'Conversia a pornit. Se proceseaza cu Basic Pitch si FluidSynth...
+(Durată estimată: 1-3 minute. Te rugăm să nu mai apeși din nou butonul)';
         
         var interval = setInterval(function() {
             fetch('/api/status/' + data.task_id + '/')
@@ -1000,10 +899,10 @@ function auth(url) {
             msgEl.style.color = '#f43f5e';
             msgEl.innerText = err.message;
             console.error("Auth error:", err);
-            alert("Eroare autentificare:\\n" + err.message);
+            alert("Eroare autentificare:\n" + err.message);
         });
     } catch (e) {
-        alert("Eroare in scriptul de login:\\n" + e.message);
+        alert("Eroare in scriptul de login:\n" + e.message);
     }
 }
 
@@ -1120,106 +1019,4 @@ function getCookie(name) {
 }
 </script>
 </body>
-</html>"""
-    return HttpResponse(html)
-
-@api_view(['POST'])
-def signup_view(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
-    if not username or not password:
-        return Response({"eroare": "Date incomplete"}, status=400)
-    if User.objects.filter(username=username).exists():
-        return Response({"eroare": "Userul exista deja"}, status=400)
-    
-    user = User.objects.create_user(username=username, password=password)
-    
-    login(request, user)
-    
-    return Response({"mesaj": "Cont creat cu succes!"})
-
-@api_view(['POST'])
-def login_view(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
-    user = authenticate(username=username, password=password)
-    if user:
-        login(request, user)
-        return Response({"mesaj": "Logat cu succes!"})
-    return Response({"eroare": "Date invalide"}, status=401)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def incarca_melodie(request):
-    if 'file' not in request.FILES:
-        return Response({"eroare": "Lipseste fisierul"}, status=400)
-    
-    fisier = request.FILES['file']
-    melodie_db = Melodie.objects.create(
-        user=request.user,
-        titlu=fisier.name,
-        fisier_original=fisier
-    )
-    
-    from .tasks import proceseaza_melodia_task
-    folder_salvare = os.path.dirname(melodie_db.fisier_original.path)
-    task = proceseaza_melodia_task.delay(melodie_db.id, fisier.name, folder_salvare)
-    
-    return Response({"task_id": task.id, "melodie_id": melodie_db.id})
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def istoric_melodii(request):
-    melodii = Melodie.objects.filter(user=request.user).order_by('-data_incarcare')
-    rezultat = []
-    
-    for m in melodii:
-        stemuri = m.stemuri.all()
-        rezultat.append({
-            "id": m.id,
-            "titlu": m.titlu,
-            "data": m.data_incarcare.strftime("%d-%m-%Y %H:%M"),
-            "url_original": m.fisier_original.url,
-            "stemuri": [
-                {
-                    "tip": s.tip,
-                    "url": s.fisier_stem.url,
-                    "este_transformat": s.este_transformat,
-                    "instrument_tinta": s.instrument_tinta
-                }
-                for s in stemuri
-            ]
-        })
-        
-    return Response(rezultat)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def detalii_melodie(request, melodie_id):
-    try:
-        melodie = Melodie.objects.get(id=melodie_id, user=request.user)
-    except Melodie.DoesNotExist:
-        return Response({"eroare": "Melodia nu a fost gasita"}, status=404)
-    
-    stemuri = melodie.stemuri.all()
-    return Response({
-        "id": melodie.id,
-        "titlu": melodie.titlu,
-        "url_original": melodie.fisier_original.url,
-        "stemuri": [
-            {
-                "id": s.id,
-                "tip": s.tip,
-                "url": s.fisier_stem.url,
-                "este_transformat": s.este_transformat,
-                "instrument_tinta": s.instrument_tinta,
-                "stem_parinte_id": s.stem_parinte_id
-            }
-            for s in stemuri
-        ]
-    })
-
-@api_view(['POST'])
-def logout_view(request):
-    logout(request)
-    return Response({"mesaj": "Delogat cu succes!"})
+</html>

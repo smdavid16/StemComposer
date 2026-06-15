@@ -5,12 +5,12 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
     git \
-    # --- ADDED THESE FOR SOX ---
     libsox-dev \
     gcc \
     g++ \
     make \
-    # ---------------------------
+    fluidsynth \
+    fluid-soundfont-gm \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -25,9 +25,10 @@ RUN pip install --no-cache-dir \
     librosa \
     celery \
     redis \
-    soundfile
+    soundfile \
+    basic-pitch \
+    pretty_midi \
+    tensorflow-cpu==2.15.0
 
 # Nussl often triggers the soxbindings build, so we run it here
 RUN pip install --no-cache-dir nussl
-
-# ... (rest of your Dockerfile)
