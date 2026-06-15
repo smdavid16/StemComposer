@@ -1346,6 +1346,7 @@ function pollStatus(taskId) {
             var cDiv = document.getElementById('console');
             if (data.log) { cDiv.innerText = data.log; cDiv.scrollTop = cDiv.scrollHeight; }
             if (data.state === 'SUCCESS') { clearInterval(interval); incarcaIstoric(); }
+            else if (data.state === 'FAILURE') { clearInterval(interval); incarcaIstoric(); }
         });
     }, 1500);
 }
