@@ -45,7 +45,7 @@ def verifica_status(request, task_id):
     res = AsyncResult(task_id)
     nume_fisier = request.GET.get('nume', '')
     
-    nume_folder_piesa = nume_fisier.split('.')[0] if nume_fisier else ''
+    nume_folder_piesa = os.path.splitext(nume_fisier)[0] if nume_fisier else ''
     
     cale_rezultate = os.path.join(os.getcwd(), 'melodii_de_procesat', 'separated', 'htdemucs', nume_folder_piesa)
     gata = os.path.exists(cale_rezultate)

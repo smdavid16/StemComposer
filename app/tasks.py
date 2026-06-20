@@ -44,7 +44,7 @@ def proceseaza_melodia_task(self, melodie_id, nume_fisier, cale_folder_melodii):
         if proces.returncode == 0:
             from .models import Melodie, Stem
             melodie_db = Melodie.objects.get(id=melodie_id)
-            nume_folder = nume_fisier.split('.')[0]
+            nume_folder = os.path.splitext(nume_fisier)[0]
             
             tipuri = ['vocals', 'drums', 'bass', 'other']
             for t in tipuri:
